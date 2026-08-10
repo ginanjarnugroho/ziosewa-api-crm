@@ -168,19 +168,23 @@ const start = async () => {
           DO $$ BEGIN
               CREATE TYPE "TriggerType" AS ENUM ('EVENT_STATUS_CHANGED', 'TIME_DUE_COUNTDOWN', 'TIME_OVERDUE');
           EXCEPTION WHEN duplicate_object THEN null; END $$;
-
+        `);
+        await prisma.$executeRawUnsafe(`
           DO $$ BEGIN
               CREATE TYPE "OffsetUnit" AS ENUM ('MINUTES', 'HOURS', 'DAYS');
           EXCEPTION WHEN duplicate_object THEN null; END $$;
-
+        `);
+        await prisma.$executeRawUnsafe(`
           DO $$ BEGIN
               CREATE TYPE "OffsetDirection" AS ENUM ('IMMEDIATE', 'BEFORE', 'AFTER');
           EXCEPTION WHEN duplicate_object THEN null; END $$;
-
+        `);
+        await prisma.$executeRawUnsafe(`
           DO $$ BEGIN
               CREATE TYPE "NotificationStatus" AS ENUM ('PENDING', 'SENT', 'FAILED', 'CANCELLED');
           EXCEPTION WHEN duplicate_object THEN null; END $$;
-
+        `);
+        await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "message_templates" (
               "id" UUID NOT NULL DEFAULT gen_random_uuid(),
               "tenant_id" UUID NOT NULL,
@@ -191,7 +195,8 @@ const start = async () => {
               CONSTRAINT "message_templates_pkey" PRIMARY KEY ("id"),
               CONSTRAINT "message_templates_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE
           );
-
+        `);
+        await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "automation_rules" (
               "id" UUID NOT NULL DEFAULT gen_random_uuid(),
               "tenant_id" UUID NOT NULL,
@@ -211,7 +216,8 @@ const start = async () => {
               CONSTRAINT "automation_rules_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
               CONSTRAINT "automation_rules_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "message_templates"("id") ON DELETE CASCADE ON UPDATE CASCADE
           );
-
+        `);
+        await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "scheduled_notifications" (
               "id" UUID NOT NULL DEFAULT gen_random_uuid(),
               "tenant_id" UUID NOT NULL,
@@ -232,10 +238,10 @@ const start = async () => {
               CONSTRAINT "scheduled_notifications_pkey" PRIMARY KEY ("id"),
               CONSTRAINT "scheduled_notifications_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE
           );
-
-          CREATE INDEX IF NOT EXISTS "scheduled_notifications_status_scheduled_at_idx" ON "scheduled_notifications"("status", "scheduled_at");
-          CREATE INDEX IF NOT EXISTS "scheduled_notifications_order_id_idx" ON "scheduled_notifications"("order_id");
         `);
+        await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "scheduled_notifications_status_scheduled_at_idx" ON "scheduled_notifications"("status", "scheduled_at");`);
+        await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "scheduled_notifications_order_id_idx" ON "scheduled_notifications"("order_id");`);
+
         console.log('[Auto-Fix] Successfully verified / created automation database tables.');
       } catch (e) {
         console.error('[Automation Tables DDL Error]', e);
