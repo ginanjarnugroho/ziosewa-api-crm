@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import prisma from '../repositories/prisma';
-import WahaAdapter from '../adapters/WahaAdapter';
+import { WahaAdapter } from '../adapters/WahaAdapter';
 
 export default async function outboxController(fastify: FastifyInstance) {
   // GET Outbox Notifications

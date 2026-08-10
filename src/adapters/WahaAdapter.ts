@@ -260,3 +260,6 @@ export class WahaAdapter implements MessagingChannelAdapter {
     }
   }
 }
+
+export default WahaAdapter;
+

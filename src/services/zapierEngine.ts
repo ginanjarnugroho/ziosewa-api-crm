@@ -1,5 +1,5 @@
 import prisma from '../repositories/prisma';
-import WahaAdapter from '../adapters/WahaAdapter';
+import { WahaAdapter } from '../adapters/WahaAdapter';
 
 export interface WebhookPayload {
   tenant_id?: string;
