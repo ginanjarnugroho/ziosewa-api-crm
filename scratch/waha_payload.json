@@ -10298,3 +10298,327 @@
   }
 }
 ,
+{
+  "id": "false_120363285430744169@g.us_2A3C2E9BED1D1DFF40C7_70356211634265@lid",
+  "timestamp": 1786346890,
+  "from": "120363285430744169@g.us",
+  "fromMe": false,
+  "source": "app",
+  "body": "Yuk gets",
+  "to": "70356211634265@lid",
+  "participant": "70356211634265@lid",
+  "hasMedia": false,
+  "media": null,
+  "ack": 2,
+  "location": null,
+  "vCards": null,
+  "ackName": "DEVICE",
+  "replyTo": null,
+  "_data": {
+    "Info": {
+      "Chat": "120363285430744169@g.us",
+      "Sender": "70356211634265@lid",
+      "IsFromMe": false,
+      "IsGroup": true,
+      "AddressingMode": "lid",
+      "SenderAlt": "6282181863532@s.whatsapp.net",
+      "RecipientAlt": "",
+      "BroadcastListOwner": "",
+      "BroadcastRecipients": null,
+      "ID": "2A3C2E9BED1D1DFF40C7",
+      "ServerID": 0,
+      "Type": "text",
+      "PushName": "Indonesia Tour Connect",
+      "Timestamp": "2026-08-10T07:28:10Z",
+      "Category": "",
+      "Multicast": false,
+      "MediaType": "",
+      "Edit": "",
+      "MsgBotInfo": {
+        "EditType": "",
+        "EditTargetID": "",
+        "EditSenderTimestampMS": "0001-01-01T00:00:00Z"
+      },
+      "MsgMetaInfo": {
+        "TargetID": "",
+        "TargetSender": "",
+        "TargetChat": "",
+        "DeprecatedLIDSession": null,
+        "ThreadMessageID": "",
+        "ThreadMessageSenderJID": ""
+      },
+      "IsNewsletterStatus": false,
+      "VerifiedName": null,
+      "DeviceSentMeta": null
+    },
+    "Message": {
+      "conversation": "Yuk gets",
+      "messageContextInfo": {
+        "messageSecret": "L9xrVO0VPA6ve1FaTZrrMqoNdlAXIfORxRBTlYLU/e8="
+      }
+    },
+    "IsEphemeral": false,
+    "IsViewOnce": false,
+    "IsViewOnceV2": false,
+    "IsViewOnceV2Extension": false,
+    "IsDocumentWithCaption": false,
+    "IsLottieSticker": false,
+    "IsBotInvoke": false,
+    "IsEdit": false,
+    "SourceWebMsg": null,
+    "UnavailableRequestID": "",
+    "RetryCount": 0,
+    "NewsletterMeta": null,
+    "RawMessage": {
+      "conversation": "Yuk gets",
+      "messageContextInfo": {
+        "messageSecret": "L9xrVO0VPA6ve1FaTZrrMqoNdlAXIfORxRBTlYLU/e8="
+      }
+    },
+    "Status": 3
+  }
+}
+,
+{
+  "id": "false_120363285430744169@g.us_2A3C2E9BED1D1DFF40C7_70356211634265@lid",
+  "timestamp": 1786346890,
+  "from": "120363285430744169@g.us",
+  "fromMe": false,
+  "source": "app",
+  "body": "Yuk gets",
+  "to": "70356211634265@lid",
+  "participant": "70356211634265@lid",
+  "hasMedia": false,
+  "media": null,
+  "ack": 2,
+  "location": null,
+  "vCards": null,
+  "ackName": "DEVICE",
+  "replyTo": null,
+  "_data": {
+    "Info": {
+      "Chat": "120363285430744169@g.us",
+      "Sender": "70356211634265@lid",
+      "IsFromMe": false,
+      "IsGroup": true,
+      "AddressingMode": "lid",
+      "SenderAlt": "6282181863532@s.whatsapp.net",
+      "RecipientAlt": "",
+      "BroadcastListOwner": "",
+      "BroadcastRecipients": null,
+      "ID": "2A3C2E9BED1D1DFF40C7",
+      "ServerID": 0,
+      "Type": "text",
+      "PushName": "Indonesia Tour Connect",
+      "Timestamp": "2026-08-10T07:28:10Z",
+      "Category": "",
+      "Multicast": false,
+      "MediaType": "",
+      "Edit": "",
+      "MsgBotInfo": {
+        "EditType": "",
+        "EditTargetID": "",
+        "EditSenderTimestampMS": "0001-01-01T00:00:00Z"
+      },
+      "MsgMetaInfo": {
+        "TargetID": "",
+        "TargetSender": "",
+        "TargetChat": "",
+        "DeprecatedLIDSession": null,
+        "ThreadMessageID": "",
+        "ThreadMessageSenderJID": ""
+      },
+      "IsNewsletterStatus": false,
+      "VerifiedName": null,
+      "DeviceSentMeta": null
+    },
+    "Message": {
+      "conversation": "Yuk gets",
+      "messageContextInfo": {
+        "messageSecret": "L9xrVO0VPA6ve1FaTZrrMqoNdlAXIfORxRBTlYLU/e8="
+      }
+    },
+    "IsEphemeral": false,
+    "IsViewOnce": false,
+    "IsViewOnceV2": false,
+    "IsViewOnceV2Extension": false,
+    "IsDocumentWithCaption": false,
+    "IsLottieSticker": false,
+    "IsBotInvoke": false,
+    "IsEdit": false,
+    "SourceWebMsg": null,
+    "UnavailableRequestID": "",
+    "RetryCount": 0,
+    "NewsletterMeta": null,
+    "RawMessage": {
+      "conversation": "Yuk gets",
+      "messageContextInfo": {
+        "messageSecret": "L9xrVO0VPA6ve1FaTZrrMqoNdlAXIfORxRBTlYLU/e8="
+      }
+    },
+    "Status": 3
+  }
+}
+,
+{
+  "id": "false_120363285430744169@g.us_3A973391147543CF28B6_32968219349079@lid",
+  "timestamp": 1786347519,
+  "from": "120363285430744169@g.us",
+  "fromMe": false,
+  "source": "app",
+  "body": "Otw",
+  "to": "32968219349079@lid",
+  "participant": "32968219349079@lid",
+  "hasMedia": false,
+  "media": null,
+  "ack": 2,
+  "location": null,
+  "vCards": null,
+  "ackName": "DEVICE",
+  "replyTo": null,
+  "_data": {
+    "Info": {
+      "Chat": "120363285430744169@g.us",
+      "Sender": "32968219349079@lid",
+      "IsFromMe": false,
+      "IsGroup": true,
+      "AddressingMode": "lid",
+      "SenderAlt": "6281360403365@s.whatsapp.net",
+      "RecipientAlt": "",
+      "BroadcastListOwner": "",
+      "BroadcastRecipients": null,
+      "ID": "3A973391147543CF28B6",
+      "ServerID": 0,
+      "Type": "text",
+      "PushName": "Ginanjar Nugroho",
+      "Timestamp": "2026-08-10T07:38:39Z",
+      "Category": "",
+      "Multicast": false,
+      "MediaType": "",
+      "Edit": "",
+      "MsgBotInfo": {
+        "EditType": "",
+        "EditTargetID": "",
+        "EditSenderTimestampMS": "0001-01-01T00:00:00Z"
+      },
+      "MsgMetaInfo": {
+        "TargetID": "",
+        "TargetSender": "",
+        "TargetChat": "",
+        "DeprecatedLIDSession": null,
+        "ThreadMessageID": "",
+        "ThreadMessageSenderJID": ""
+      },
+      "IsNewsletterStatus": false,
+      "VerifiedName": null,
+      "DeviceSentMeta": null
+    },
+    "Message": {
+      "conversation": "Otw",
+      "messageContextInfo": {
+        "messageSecret": "CgvLiUvla3Ip1Qf4078siuzJKRAa5lacwQzonJ1g3tw="
+      }
+    },
+    "IsEphemeral": false,
+    "IsViewOnce": false,
+    "IsViewOnceV2": false,
+    "IsViewOnceV2Extension": false,
+    "IsDocumentWithCaption": false,
+    "IsLottieSticker": false,
+    "IsBotInvoke": false,
+    "IsEdit": false,
+    "SourceWebMsg": null,
+    "UnavailableRequestID": "",
+    "RetryCount": 0,
+    "NewsletterMeta": null,
+    "RawMessage": {
+      "conversation": "Otw",
+      "messageContextInfo": {
+        "messageSecret": "CgvLiUvla3Ip1Qf4078siuzJKRAa5lacwQzonJ1g3tw="
+      }
+    },
+    "Status": 3
+  }
+}
+,
+{
+  "id": "false_120363285430744169@g.us_3A973391147543CF28B6_32968219349079@lid",
+  "timestamp": 1786347519,
+  "from": "120363285430744169@g.us",
+  "fromMe": false,
+  "source": "app",
+  "body": "Otw",
+  "to": "32968219349079@lid",
+  "participant": "32968219349079@lid",
+  "hasMedia": false,
+  "media": null,
+  "ack": 2,
+  "location": null,
+  "vCards": null,
+  "ackName": "DEVICE",
+  "replyTo": null,
+  "_data": {
+    "Info": {
+      "Chat": "120363285430744169@g.us",
+      "Sender": "32968219349079@lid",
+      "IsFromMe": false,
+      "IsGroup": true,
+      "AddressingMode": "lid",
+      "SenderAlt": "6281360403365@s.whatsapp.net",
+      "RecipientAlt": "",
+      "BroadcastListOwner": "",
+      "BroadcastRecipients": null,
+      "ID": "3A973391147543CF28B6",
+      "ServerID": 0,
+      "Type": "text",
+      "PushName": "Ginanjar Nugroho",
+      "Timestamp": "2026-08-10T07:38:39Z",
+      "Category": "",
+      "Multicast": false,
+      "MediaType": "",
+      "Edit": "",
+      "MsgBotInfo": {
+        "EditType": "",
+        "EditTargetID": "",
+        "EditSenderTimestampMS": "0001-01-01T00:00:00Z"
+      },
+      "MsgMetaInfo": {
+        "TargetID": "",
+        "TargetSender": "",
+        "TargetChat": "",
+        "DeprecatedLIDSession": null,
+        "ThreadMessageID": "",
+        "ThreadMessageSenderJID": ""
+      },
+      "IsNewsletterStatus": false,
+      "VerifiedName": null,
+      "DeviceSentMeta": null
+    },
+    "Message": {
+      "conversation": "Otw",
+      "messageContextInfo": {
+        "messageSecret": "CgvLiUvla3Ip1Qf4078siuzJKRAa5lacwQzonJ1g3tw="
+      }
+    },
+    "IsEphemeral": false,
+    "IsViewOnce": false,
+    "IsViewOnceV2": false,
+    "IsViewOnceV2Extension": false,
+    "IsDocumentWithCaption": false,
+    "IsLottieSticker": false,
+    "IsBotInvoke": false,
+    "IsEdit": false,
+    "SourceWebMsg": null,
+    "UnavailableRequestID": "",
+    "RetryCount": 0,
+    "NewsletterMeta": null,
+    "RawMessage": {
+      "conversation": "Otw",
+      "messageContextInfo": {
+        "messageSecret": "CgvLiUvla3Ip1Qf4078siuzJKRAa5lacwQzonJ1g3tw="
+      }
+    },
+    "Status": 3
+  }
+}
+,
