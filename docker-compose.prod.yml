@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  crm-api:
+    build: .
+    container_name: ziosewa_crm_api_prod
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - PORT=3000
+    volumes:
+      # INI ADALAH KUNCI PERSISTENCE NYA!
+      # Folder lokal 'wa_sessions' di server akan dihubungkan dengan folder '/app/sessions' di dalam Docker.
+      # Saat GitHub Actions merestart / mendownload ulang container, file ini akan TETAP AMAN.
+      - ./wa_sessions:/app/sessions

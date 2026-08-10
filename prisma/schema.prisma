@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  active
+  suspended
+  trial
+}
+
+model Tenant {
+  id         String       @id @default(uuid()) @db.Uuid
+  name       String       @db.VarChar
+  status     TenantStatus @default(active)
+  webhookUrl String?      @map("webhook_url") @db.VarChar
+  apiKey     String       @default(uuid()) @map("api_key") @db.VarChar
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  devices       Device[]
+  messageLogs   MessageLog[]
+  contacts      Contact[]
+  chatMessages  ChatMessage[]
+
+  @@map("tenants")
+}
+
+enum ChannelType {
+  wa_unofficial
+  wa_cloud
+  telegram
+  line
+}
+
+enum DeviceStatus {
+  connected
+  disconnected
+  banned
+  pairing
+}
+
+model Device {
+  id               String       @id @default(uuid()) @db.Uuid
+  tenantId         String       @map("tenant_id") @db.Uuid
+  deviceIdentifier String       @map("device_identifier") @db.VarChar
+  channelType      ChannelType  @map("channel_type")
+  status           DeviceStatus @default(pairing)
+  providerConfig   Json?        @map("provider_config") @db.JsonB
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messageLogs      MessageLog[]
+  contacts         Contact[]
+  chatMessages     ChatMessage[]
+
+  @@map("devices")
+}
+
+enum MessageDirection {
+  inbound
+  outbound
+}
+
+enum MessageType {
+  text
+  media
+  interactive
+}
+
+enum MessageStatus {
+  queued
+  sent
+  delivered
+  read
+  failed
+}
+
+model MessageLog {
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  deviceId    String           @map("device_id") @db.Uuid
+  channelType String           @map("channel_type") @db.VarChar
+  direction   MessageDirection
+  recipient   String           @db.VarChar
+  messageType MessageType      @map("message_type")
+  payload     Json?            @db.JsonB
+  status      MessageStatus    @default(queued)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device      Device           @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("message_logs")
+}
+
+model Contact {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  deviceId     String   @map("device_id") @db.Uuid
+  remoteJid    String   @map("remote_jid") @db.VarChar
+  pushName     String?  @map("push_name") @db.VarChar
+  verifiedName String?  @map("verified_name") @db.VarChar
+  profilePic   String?  @map("profile_pic") @db.VarChar
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, remoteJid]) // A device can only have one contact record per remoteJid
+  @@map("contacts")
+}
+
+model ChatMessage {
+  id          String        @id @default(uuid()) @db.Uuid
+  tenantId    String        @map("tenant_id") @db.Uuid
+  deviceId    String        @map("device_id") @db.Uuid
+  remoteJid   String        @map("remote_jid") @db.VarChar
+  messageId   String        @map("message_id") @db.VarChar // WhatsApp message key.id
+  isFromMe    Boolean       @map("is_from_me")
+  text        String?       @db.Text
+  messageType MessageType   @map("message_type")
+  timestamp   DateTime
+  status      MessageStatus @default(sent)
+  mediaUrl    String?       @map("media_url") @db.VarChar // for public URL / CDN
+  mediaPath   String?       @map("media_path") @db.VarChar // for local disk path
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, remoteJid, messageId])
+  @@index([deviceId, remoteJid, timestamp])
+  @@map("chat_messages")
+}

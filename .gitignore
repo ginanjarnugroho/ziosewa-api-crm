@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment and Secrets
+.env
+.env.production
+.env.local
+
+# Service account credentials & private keys
+itc-compro-project-*.json
+*.pem
+*.key
+
+# Build & compiled output
+dist/
+build/
+*.log
+
+# Redis dump and temp files
+dump.rdb
+db_out.txt
+*.tmp
+
+# OS & Editor files
+.DS_Store
+.vscode/
+.idea/
