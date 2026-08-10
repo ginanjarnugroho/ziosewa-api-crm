@@ -14,6 +14,10 @@ import chatController from './controllers/chatController';
 import contactController from './controllers/contactController';
 import tenantController from './controllers/tenantController';
 import wahaWebhookController from './controllers/wahaWebhookController';
+import webhookCatchController from './controllers/webhookCatchController';
+import automationRuleController from './controllers/automationRuleController';
+import outboxController from './controllers/outboxController';
+import { startAutomationScheduler } from './queues/automationWorker';
 import './queues/mediaDownloadWorker'; // Initialize background media downloader
 
 const server = Fastify({
@@ -102,6 +106,9 @@ server.register(chatController);
 server.register(contactController);
 server.register(tenantController);
 server.register(wahaWebhookController);
+server.register(webhookCatchController);
+server.register(automationRuleController);
+server.register(outboxController);
 
 // Graceful shutdown helper
 const closeListeners = ['SIGINT', 'SIGTERM'];
@@ -154,6 +161,9 @@ const start = async () => {
       } catch (e) {
         console.error('[JID Auto-Merge Error]', e);
       }
+
+      // Start background automation scheduler for scheduled WhatsApp notifications
+      startAutomationScheduler(30000);
     } catch (e) {
       console.error('[Auto-Fix Error]', e);
     }

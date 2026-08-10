@@ -21,10 +21,13 @@ model Tenant {
   apiKey     String       @default(uuid()) @map("api_key") @db.VarChar
   createdAt  DateTime     @default(now()) @map("created_at")
 
-  devices       Device[]
-  messageLogs   MessageLog[]
-  contacts      Contact[]
-  chatMessages  ChatMessage[]
+  devices                Device[]
+  messageLogs            MessageLog[]
+  contacts               Contact[]
+  chatMessages           ChatMessage[]
+  messageTemplates       MessageTemplate[]
+  automationRules        AutomationRule[]
+  scheduledNotifications ScheduledNotification[]
 
   @@map("tenants")
 }
@@ -136,4 +139,90 @@ model ChatMessage {
   @@unique([deviceId, remoteJid, messageId])
   @@index([deviceId, remoteJid, timestamp])
   @@map("chat_messages")
+}
+
+enum TriggerType {
+  EVENT_STATUS_CHANGED
+  TIME_DUE_COUNTDOWN
+  TIME_OVERDUE
+}
+
+enum OffsetUnit {
+  MINUTES
+  HOURS
+  DAYS
+}
+
+enum OffsetDirection {
+  IMMEDIATE
+  BEFORE
+  AFTER
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model MessageTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  name         String   @db.VarChar
+  templateText String   @map("template_text") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rules  AutomationRule[]
+
+  @@map("message_templates")
+}
+
+model AutomationRule {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @map("tenant_id") @db.Uuid
+  name            String          @db.VarChar
+  triggerType     TriggerType     @map("trigger_type")
+  targetStatus    String          @default("ANY") @map("target_status") @db.VarChar
+  offsetValue     Int             @default(0) @map("offset_value")
+  offsetUnit      OffsetUnit      @default(HOURS) @map("offset_unit")
+  offsetDirection OffsetDirection @default(IMMEDIATE) @map("offset_direction")
+  quietHoursStart String?         @default("20:00") @map("quiet_hours_start") @db.VarChar
+  quietHoursEnd   String?         @default("08:00") @map("quiet_hours_end") @db.VarChar
+  templateId      String          @map("template_id") @db.Uuid
+  isEnabled       Boolean         @default(true) @map("is_enabled")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template MessageTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("automation_rules")
+}
+
+model ScheduledNotification {
+  id           String             @id @default(uuid()) @db.Uuid
+  tenantId     String             @map("tenant_id") @db.Uuid
+  deviceId     String?            @map("device_id") @db.Uuid
+  ruleId       String?            @map("rule_id") @db.Uuid
+  orderId      String?            @map("order_id") @db.VarChar
+  recipient    String             @db.VarChar
+  eventKey     String             @map("event_key") @db.VarChar
+  renderedText String             @map("rendered_text") @db.Text
+  scheduledAt  DateTime           @map("scheduled_at")
+  sentAt       DateTime?          @map("sent_at")
+  status       NotificationStatus @default(PENDING)
+  retryCount   Int                @default(0) @map("retry_count")
+  lastError    String?            @map("last_error") @db.Text
+  metadata     Json?              @db.JsonB
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([orderId])
+  @@map("scheduled_notifications")
 }
