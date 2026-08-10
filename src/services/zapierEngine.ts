@@ -1,4 +1,4 @@
-import prisma from '../repositories/prisma';
+import { prisma } from '../repositories/prisma';
 import { WahaAdapter } from '../adapters/WahaAdapter';
 
 export interface WebhookPayload {

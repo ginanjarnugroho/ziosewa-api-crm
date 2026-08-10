@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import prisma from '../repositories/prisma';
+import { prisma } from '../repositories/prisma';
 import { compileTemplateText } from '../services/zapierEngine';
 
 export default async function automationRuleController(fastify: FastifyInstance) {
