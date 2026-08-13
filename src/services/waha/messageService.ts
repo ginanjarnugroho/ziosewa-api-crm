@@ -43,8 +43,6 @@ export async function handleMessageAny(payload: any, device: any, deviceId: stri
      return;
   }
 
-  // Tulis payload sementara ke file lokal untuk kebutuhan proses analisis / log error
-  fs.appendFileSync('scratch/waha_payload.json', JSON.stringify(msg, null, 2) + '\n,\n');
 
   const isFromMe = msg.fromMe || false;
 
