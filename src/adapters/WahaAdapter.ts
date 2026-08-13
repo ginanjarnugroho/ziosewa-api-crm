@@ -4,13 +4,20 @@ import axios from 'axios';
 import { io } from '../server';
 import { uploadFromUrl, getExtFromUrl, getSignedUrl } from '../services/gcsService';
 import QRCode from 'qrcode';
+import axios from 'axios';
+import { config } from '../config/env';
 
-const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3001';
-const WAHA_API_KEY = process.env.WAHA_API_KEY || 'waha_secret_key';
-
-// WAHA (cloud) sends webhooks ke backend kita via Cloudflare Tunnel atau URL publik
-// Set WAHA_WEBHOOK_URL di .env ke URL publik backend, contoh: https://api-crm.ziosewa.com/api/v1/webhooks/waha
-const WAHA_WEBHOOK_URL = process.env.WAHA_WEBHOOK_URL || 'http://host.docker.internal:3000/api/v1/webhooks/waha';
+const WAHA_URL = config.wahaUrl;
+const WAHA_API_KEY = config.wahaApiKey;
+const axiosInstance = axios.create({
+  baseURL: WAHA_URL,
+  headers: {
+    'accept': 'application/json',
+    'Content-Type': 'application/json',
+    'X-Api-Key': WAHA_API_KEY
+  }
+});
+const WAHA_WEBHOOK_URL = config.wahaWebhookUrl;
 
 export class WahaAdapter implements MessagingChannelAdapter {
   private getHeaders() {
@@ -19,6 +26,16 @@ export class WahaAdapter implements MessagingChannelAdapter {
       'Accept': 'application/json',
       'X-Api-Key': WAHA_API_KEY
     };
+  }
+
+  async sendMessage(deviceId: string, recipient: string, text: string): Promise<any> {
+    // Helper to send text via WAHA session
+    const res = await axios.post(`${WAHA_URL}/api/sendText`, {
+      session: deviceId,
+      chatId: recipient,
+      text: text
+    }, { headers: this.getHeaders() });
+    return res.data;
   }
 
   async connect(deviceId: string, deviceIdentifier: string): Promise<void> {
@@ -53,7 +70,9 @@ export class WahaAdapter implements MessagingChannelAdapter {
                       "session.status",
                       "message",
                       "message.any",
-                      "message.ack"
+                      "message.ack",
+                      "message.reaction",
+                      "presence.update"
                     ]
                   }
                 ]
@@ -109,7 +128,9 @@ export class WahaAdapter implements MessagingChannelAdapter {
                   "session.status",
                   "message",
                   "message.any",
-                  "message.ack"
+                  "message.ack",
+                  "message.reaction",
+                  "presence.update"
                 ]
               }
             ]
@@ -136,12 +157,33 @@ export class WahaAdapter implements MessagingChannelAdapter {
   }
 
   async sendText(deviceId: string, payload: SendMessagePayload): Promise<any> {
-    const res = await axios.post(`${WAHA_URL}/api/sendText`, {
+    const data: any = {
       session: deviceId,
       chatId: payload.to,
       text: payload.message
-    }, { headers: this.getHeaders() });
+    };
+    if (payload.reply_to) {
+      data.reply_to = payload.reply_to;
+    }
+    const res = await axios.post(`${WAHA_URL}/api/sendText`, data, { headers: this.getHeaders() });
     return res.data;
+  }
+
+  async sendReaction(deviceId: string, payload: { to: string, messageId: string, emoji: string }): Promise<any> {
+    const data = {
+      session: deviceId,
+      chatId: payload.to,
+      messageId: payload.messageId,
+      reaction: payload.emoji
+    };
+    try {
+      console.log('[WAHA] Sending reaction:', data);
+      const res = await axios.put(`${WAHA_URL}/api/reaction`, data, { headers: this.getHeaders() });
+      return res.data;
+    } catch (err: any) {
+      console.error('[WAHA ERROR] sendReaction failed:', err.response?.data || err.message);
+      throw err;
+    }
   }
 
   async getStatus(deviceId: string): Promise<string> {
@@ -165,7 +207,6 @@ export class WahaAdapter implements MessagingChannelAdapter {
 
     for (const contactId of new Set(candidates)) {
       try {
-        // Use the new path-based endpoint for chat picture
         const res = await axios.get(`${WAHA_URL}/api/${session}/chats/${encodeURIComponent(contactId)}/picture`, {
           headers: this.getHeaders()
         });
@@ -174,10 +215,8 @@ export class WahaAdapter implements MessagingChannelAdapter {
         if (typeof res.data === 'string') {
           url = res.data;
         } else if (res.data && typeof res.data === 'object') {
-          // WAHA may return different key casings (profilePictureURL, profilePictureUrl, etc.)
           url =
             res.data.profilePictureURL ||
-            res.data.profilePictureUrl ||
             res.data.profilePictureUrl ||
             res.data.profile_picture ||
             res.data.url ||
@@ -186,7 +225,6 @@ export class WahaAdapter implements MessagingChannelAdapter {
         }
 
         if (url) {
-          // Upload ke GCS supaya URL lebih stabil dan tidak expired
           try {
             const ext = getExtFromUrl(url);
             const gcsPath = `avatars/${session}/${contactId.replace('@', '_')}${ext}`;
@@ -195,7 +233,7 @@ export class WahaAdapter implements MessagingChannelAdapter {
             return gcsUrl;
           } catch (gcsErr: any) {
             console.warn(`[GCS WARN] Upload failed for ${contactId}, using WAHA URL:`, gcsErr.message);
-            return url; // fallback ke WAHA URL jika GCS gagal
+            return url;
           }
         }
       } catch (e: any) {
@@ -216,7 +254,6 @@ export class WahaAdapter implements MessagingChannelAdapter {
   async sendMedia(deviceId: string, payload: { to: string, caption?: string, url?: string, mimetype?: string, filename?: string }): Promise<any> {
     if (!payload.url) throw new Error("URL is required to send media via WAHA Adapter");
 
-    // WAHA requires different endpoints based on media type
     let endpointType = 'File';
     if (payload.mimetype?.startsWith('image/')) endpointType = 'Image';
     else if (payload.mimetype?.startsWith('video/')) endpointType = 'Video';
@@ -245,6 +282,10 @@ export class WahaAdapter implements MessagingChannelAdapter {
        wahaPayload.caption = payload.caption;
     }
 
+    if ((payload as any).reply_to) {
+      wahaPayload.reply_to = (payload as any).reply_to;
+    }
+
     try {
       const response = await axios.post(`${WAHA_URL}/api/send${endpointType}`, wahaPayload, {
         headers: this.getHeaders()
@@ -262,4 +303,3 @@ export class WahaAdapter implements MessagingChannelAdapter {
 }
 
 export default WahaAdapter;
-

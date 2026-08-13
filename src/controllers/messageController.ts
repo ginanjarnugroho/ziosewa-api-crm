@@ -1,9 +1,11 @@
 import { FastifyInstance } from 'fastify';
-import { prisma } from '../repositories/prisma';
+import { findDeviceByIdentifier } from '../repositories/deviceRepository';
+import { createMessageLog } from '../repositories/messageLogRepository';
 import { messageQueue } from '../queues/messageWorker';
 import { AdapterFactory } from '../services/AdapterFactory';
 import path from 'path';
 import { uploadBuffer } from '../services/gcsService';
+import { normalizeJid } from '../utils/phoneUtils';
 
 export default async function messageController(fastify: FastifyInstance) {
   fastify.post('/api/v1/messages/send-text', {
@@ -18,42 +20,45 @@ export default async function messageController(fastify: FastifyInstance) {
           to: { type: 'string', description: 'Phone number with country code (e.g., 62812...)' },
           message: { type: 'string' },
           idempotency_key: { type: 'string' },
+          reply_to: { type: 'string' },
           tenant_id: { type: 'string' }
         }
       }
     }
   }, async (request, reply) => {
-    const { device_id, to, message, idempotency_key, tenant_id } = request.body as any;
+    // 1. Ambil data payload (pengirim, tujuan, isi pesan) dari request body
+    const { device_id, to, message, idempotency_key, reply_to, tenant_id } = request.body as any;
+    const toJid = normalizeJid(to);
 
-    const device = await prisma.device.findFirst({ where: { deviceIdentifier: device_id } });
+    // 2. Cari data perangkat (Device) melalui Repository Layer
+    const device = await findDeviceByIdentifier(device_id);
     if (!device) return reply.status(404).send({ error: 'Device not found' });
 
-    // Ensure device is connected
+    // 3. Pastikan perangkat (Device) sedang terkoneksi ke server WAHA
     const adapter = AdapterFactory.getAdapter(device.channelType);
     const status = await adapter.getStatus(device.id);
     if (status !== 'connected') {
       return reply.status(400).send({ error: 'Device is not connected' });
     }
 
-    // Create message log
-    const log = await prisma.messageLog.create({
-      data: {
-        tenantId: tenant_id || device.tenantId,
-        deviceId: device.id,
-        channelType: device.channelType,
-        direction: 'outbound',
-        recipient: to,
-        messageType: 'text',
-        payload: { message, idempotency_key },
-        status: 'queued'
-      }
+    // 4. Catat pesan ini ke dalam Log (MessageLog) sebagai antrean ('queued')
+    const log = await createMessageLog({
+      tenantId: tenant_id || device.tenantId,
+      deviceId: device.id,
+      channelType: device.channelType,
+      direction: 'outbound',
+      recipient: toJid,
+      messageType: 'text',
+      payload: { message, idempotency_key, reply_to },
+      status: 'queued'
     });
 
-    // Enqueue message
+    // 5. Masukkan pesan ke dalam Antrean Background (BullMQ / Redis)
+    //    agar pengiriman pesan tidak memblokir respon HTTP (Non-blocking)
     const job = await messageQueue.add('sendText', {
       deviceId: device.id,
       channelType: device.channelType,
-      payload: { to, message, idempotency_key },
+      payload: { to: toJid, message, idempotency_key, reply_to },
       logId: log.id
     });
 
@@ -83,35 +88,38 @@ export default async function messageController(fastify: FastifyInstance) {
     const captionField = data.fields['caption'] as any;
     const channelField = data.fields['channel_type'] as any;
     const idempotencyKeyField = data.fields['idempotency_key'] as any;
+    const replyToField = data.fields['reply_to'] as any;
 
     const deviceId = deviceIdField?.value;
     const to = toField?.value;
     const caption = captionField?.value || '';
     const channelType = channelField?.value || 'wa_unofficial';
     const idempotencyKey = idempotencyKeyField?.value;
+    const reply_to = replyToField?.value;
 
     if (!deviceId || !to) return reply.status(400).send({ success: false, error: 'Missing device_id or to' });
 
     try {
       const buffer = await data.toBuffer();
       
-      const device = await prisma.device.findFirst({ where: { deviceIdentifier: deviceId } });
+      const device = await findDeviceByIdentifier(deviceId);
       if (!device) return reply.status(404).send({ error: 'Device not found' });
       
       if (device.status === 'disconnected') {
         return reply.status(400).send({ error: 'Device is disconnected' });
       }
 
-      // Generate a temporary message ID or track it
+      // 3. Hasilkan ID Pesan Sementara (Temporary ID)
+      // ID ini nantinya akan dicocokkan & diganti oleh Webhook ketika pesan benar-benar terkirim.
       const msgId = `media_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      // Upload buffer to GCS first
+      // 4. Upload file yang dikirim pengguna ke Google Cloud Storage (GCS)
       const ext = path.extname(data.filename) || '';
       const gcsPath = `outbound-media/${deviceId}/${msgId}${ext}`;
       
       const gcsUrl = await uploadBuffer(buffer, gcsPath, data.mimetype);
 
-      // Add to Queue instead of sending directly
+      // 5. Masukkan tugas pengiriman Media ini ke dalam Antrean (Queue)
       const job = await messageQueue.add('sendMedia', {
         tenantId: device.tenantId,
         deviceId: device.id,
@@ -122,7 +130,8 @@ export default async function messageController(fastify: FastifyInstance) {
           mimetype: data.mimetype,
           filename: data.filename,
           url: gcsUrl,
-          idempotency_key: idempotencyKey
+          idempotency_key: idempotencyKey,
+          reply_to
         }
       }, {
         attempts: 3,

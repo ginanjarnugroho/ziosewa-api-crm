@@ -1,6 +1,7 @@
 import { prisma } from '../repositories/prisma';
 import { WahaAdapter } from '../adapters/WahaAdapter';
 import { enforceQuietHours } from '../services/zapierEngine';
+import { formatHumanError } from '../utils/errorUtils';
 
 let isRunning = false;
 
@@ -11,18 +12,23 @@ export async function processScheduledNotifications() {
   try {
     const now = new Date();
 
-    // Fetch pending notifications scheduled for now or earlier
-    const pendingNotifs = await prisma.scheduledNotification.findMany({
-      where: {
-        status: 'PENDING',
-        scheduledAt: { lte: now }
-      },
-      take: 20,
-      orderBy: { scheduledAt: 'asc' }
-    });
+    // Fetch pending notifications scheduled for now or earlier with resilient error handling
+    let pendingNotifs: any[] = [];
+    try {
+      pendingNotifs = await prisma.scheduledNotification.findMany({
+        where: {
+          status: 'PENDING',
+          scheduledAt: { lte: now }
+        },
+        take: 20,
+        orderBy: { scheduledAt: 'asc' }
+      });
+    } catch (dbErr: any) {
+      console.warn('[Automation Worker Warning] Database connection busy or temporary timeout, retrying next cycle:', dbErr?.message || dbErr);
+      return;
+    }
 
     if (pendingNotifs.length === 0) {
-      isRunning = false;
       return;
     }
 
@@ -32,8 +38,6 @@ export async function processScheduledNotifications() {
     });
 
     if (!device) {
-      console.warn('[Automation Worker] No active connected WhatsApp device available for dispatch.');
-      isRunning = false;
       return;
     }
 
@@ -55,7 +59,7 @@ export async function processScheduledNotifications() {
       }
 
       try {
-        await wahaAdapter.sendMessage(device.deviceIdentifier, notif.recipient, notif.renderedText);
+        await wahaAdapter.sendMessage(device.id, notif.recipient, notif.renderedText);
 
         await prisma.scheduledNotification.update({
           where: { id: notif.id },
@@ -67,6 +71,7 @@ export async function processScheduledNotifications() {
         });
         console.log(`[Automation Worker] Successfully sent automated message to ${notif.recipient}`);
       } catch (err: any) {
+        const humanError = formatHumanError(err);
         const nextRetryCount = notif.retryCount + 1;
         const isMaxRetries = nextRetryCount >= 3;
 
@@ -75,12 +80,12 @@ export async function processScheduledNotifications() {
           data: {
             status: isMaxRetries ? 'FAILED' : 'PENDING',
             retryCount: nextRetryCount,
-            lastError: err.message,
+            lastError: humanError,
             // Retry in 2 minutes if under max retries
             scheduledAt: isMaxRetries ? notif.scheduledAt : new Date(Date.now() + 2 * 60 * 1000)
           }
         });
-        console.error(`[Automation Worker] Failed dispatch for ${notif.id} (attempt ${nextRetryCount}/3):`, err.message);
+        console.error(`[Automation Worker] Failed dispatch for ${notif.id} (attempt ${nextRetryCount}/3):`, humanError);
       }
     }
   } catch (err) {

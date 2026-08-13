@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../repositories/prisma';
 import { WahaAdapter } from '../adapters/WahaAdapter';
+import { formatHumanError } from '../utils/errorUtils';
 
 export default async function outboxController(fastify: FastifyInstance) {
   // GET Outbox Notifications
@@ -35,7 +36,7 @@ export default async function outboxController(fastify: FastifyInstance) {
         }
       };
     } catch (err: any) {
-      return reply.status(500).send({ success: false, error: err.message });
+      return reply.status(500).send({ success: false, error: formatHumanError(err) });
     }
   });
 
@@ -49,22 +50,23 @@ export default async function outboxController(fastify: FastifyInstance) {
       });
 
       if (!notif) {
-        return reply.status(404).send({ success: false, error: 'Notification record not found' });
+        return reply.status(404).send({ success: false, error: 'Data riwayat antrean tidak ditemukan' });
       }
 
-      // Find active device
+      // Find active connected device
       const device = await prisma.device.findFirst({
         where: { status: 'connected' },
         orderBy: { updatedAt: 'desc' }
       });
 
       if (!device) {
-        return reply.status(400).send({ success: false, error: 'No active connected device available to resend message' });
+        return reply.status(400).send({ success: false, error: 'Tidak ada Perangkat WhatsApp aktif yang terhubung. Harap sambungkan perangkat WA terlebih dahulu.' });
       }
 
       try {
         const wahaAdapter = new WahaAdapter();
-        await wahaAdapter.sendMessage(device.deviceIdentifier, notif.recipient, notif.renderedText);
+        // Use device.id for session ID
+        await wahaAdapter.sendMessage(device.id, notif.recipient, notif.renderedText);
 
         const updated = await prisma.scheduledNotification.update({
           where: { id },
@@ -78,28 +80,30 @@ export default async function outboxController(fastify: FastifyInstance) {
 
         return {
           success: true,
-          message: 'Message resent successfully via WhatsApp',
+          message: 'Pesan berhasil terkirim ulang via WhatsApp!',
           data: updated
         };
       } catch (err: any) {
-        console.error(`[Manual Resend Error] Failed to resend notification ${id}:`, err);
+        const humanMessage = formatHumanError(err);
+        console.error(`[Manual Resend Error] Failed to resend notification ${id}:`, humanMessage);
+        
         const updated = await prisma.scheduledNotification.update({
           where: { id },
           data: {
             status: 'FAILED',
             retryCount: notif.retryCount + 1,
-            lastError: err.message
+            lastError: humanMessage
           }
         });
 
-        return reply.status(500).send({
+        return reply.status(400).send({
           success: false,
-          error: `Failed to resend: ${err.message}`,
+          error: `Gagal mengirim ulang: ${humanMessage}`,
           data: updated
         });
       }
     } catch (err: any) {
-      return reply.status(500).send({ success: false, error: err.message });
+      return reply.status(500).send({ success: false, error: formatHumanError(err) });
     }
   });
 }

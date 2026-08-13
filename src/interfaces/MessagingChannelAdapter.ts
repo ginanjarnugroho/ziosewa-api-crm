@@ -1,6 +1,7 @@
 export interface SendMessagePayload {
   to: string;
   message: string;
+  reply_to?: string;
   idempotency_key: string;
 }
 

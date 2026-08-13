@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { prisma } from '../repositories/prisma';
+import { findDeviceByIdentifier } from '../repositories/deviceRepository';
+import { countContacts, findContacts, updateContactName, upsertContact } from '../repositories/contactRepository';
 import { AdapterFactory } from '../services/AdapterFactory';
 
 export default async function contactController(fastify: FastifyInstance) {
@@ -25,53 +26,51 @@ export default async function contactController(fastify: FastifyInstance) {
     const limit = Number((request.query as any).limit) || 50;
 
     try {
-      const device = await prisma.device.findFirst({ where: { tenantId, deviceIdentifier: device_id } });
+      // 1. Cari perangkat berdasarkan pengenal perangkat & Tenant (Keamanan Multi-Tenant)
+      const device = await findDeviceByIdentifier(device_id, tenantId);
       if (!device) {
         reply.status(404);
         return { success: false, error: 'Device not found' };
       }
 
+      // 2. Hitung Offset untuk Paginasi Halaman (Contoh: Halaman 2, Limit 50 = Mulai dari data ke 50)
       const offset = (page - 1) * limit;
 
+      // 3. Muat Data Kontak dan Total Data secara paralel (Promise.all) agar lebih cepat
       const [contacts, total] = await Promise.all([
-        prisma.contact.findMany({
-          where: { tenantId, deviceId: device.id },
-          orderBy: { pushName: 'asc' },
-          skip: offset,
-          take: limit
-        }),
-        prisma.contact.count({
-          where: { tenantId, deviceId: device.id }
-        })
+        findContacts(tenantId, device.id, offset, limit),
+        countContacts(tenantId, device.id)
       ]);
 
       const adapter = AdapterFactory.getAdapter(device.channelType) as any;
       const socket = adapter?.getSocket ? adapter.getSocket(device.id) : null;
 
+      // 4. Proses (Mappping) setiap kontak untuk menyesuaikan nama grup dan URL foto profil
       const processedContacts = await Promise.all(contacts.map(async (c: any) => {
         let name = c.pushName || c.verifiedName || null;
+        
+        // JIKA kontak ini adalah Grup (berakhiran @g.us) DAN namanya belum ada, 
+        // perintahkan WAHA Socket untuk menarik nama (Subject) grup tersebut secara dinamis.
         if (!name && c.remoteJid.endsWith('@g.us') && socket) {
           try {
             const metadata = await socket.groupMetadata(c.remoteJid);
             if (metadata && metadata.subject) {
               name = metadata.subject;
               c.pushName = name;
-              await prisma.contact.upsert({
-                where: { deviceId_remoteJid: { deviceId: device.id, remoteJid: c.remoteJid } },
-                create: { tenantId: device.tenantId, deviceId: device.id, remoteJid: c.remoteJid, pushName: name },
-                update: { pushName: name }
-              });
+              await upsertContact(device.id, c.remoteJid, device.tenantId, name);
             }
           } catch (err) {
             console.error(`Failed to fetch group metadata for ${c.remoteJid}`, err);
           }
         }
-        // Always use our backend proxy endpoint for profile_pic so we can generate fresh Signed URLs on the fly
+        
+        // 5. Override (Timpa) URL profil dengan URL API Proxy milik kita sendiri
+        // Hal ini dilakukan agar kita bisa menghasilkan URL khusus sementara (Signed URL) dari Google Cloud Storage secara langsung
         const originalProfilePic = c.profilePic;
         const baseUrl = `${request.protocol}://${request.headers.host}`;
         c.profilePic = `${baseUrl}/api/v1/contacts/${c.remoteJid}/avatar?tenant_id=${tenantId}&device_id=${device_id}`;
         if (originalProfilePic === 'none') {
-          c.profilePic = null as any; // Explicitly no avatar
+          c.profilePic = null as any; // Secara eksplisit hapus avatar jika user tak pasang foto
         }
         return c;
       }));
@@ -118,16 +117,15 @@ export default async function contactController(fastify: FastifyInstance) {
     const { device_id, name } = request.body as any;
 
     try {
-      const device = await prisma.device.findFirst({ where: { tenantId, deviceIdentifier: device_id } });
+      // 1. Verifikasi Kepemilikan Perangkat
+      const device = await findDeviceByIdentifier(device_id, tenantId);
       if (!device) {
         reply.status(404);
         return { success: false, error: 'Device not found' };
       }
 
-      const contact = await prisma.contact.update({
-        where: { deviceId_remoteJid: { deviceId: device.id, remoteJid } },
-        data: { pushName: name }
-      });
+      // 2. Perbarui Nama Kontak di Database melalui Repository
+      const contact = await updateContactName(device.id, remoteJid, name);
       return { success: true, data: contact };
     } catch (err: any) {
       reply.status(500);

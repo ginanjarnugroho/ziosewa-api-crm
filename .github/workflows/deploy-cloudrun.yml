@@ -1,0 +1,51 @@
+name: Deploy Ziosewa CRM API to Cloud Run
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Configure Docker Authentication
+        run: gcloud auth configure-docker asia-southeast2-docker.pkg.dev --quiet
+
+      - name: Build and Push Docker Image
+        run: |
+          # Define image name based on Artifact Registry (Jakarta region)
+          IMAGE_NAME="asia-southeast2-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ziosewa-crm/api:${{ github.sha }}"
+          
+          # Build the Docker image
+          docker build -t $IMAGE_NAME .
+          
+          # Push to Artifact Registry
+          docker push $IMAGE_NAME
+          
+          # Set the IMAGE_NAME environment variable for the next step
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ziosewa-crm-api \
+            --image ${{ env.IMAGE_NAME }} \
+            --platform managed \
+            --region asia-southeast2 \
+            --allow-unauthenticated \
+            --port 3000 \
+            --update-env-vars NODE_ENV=production

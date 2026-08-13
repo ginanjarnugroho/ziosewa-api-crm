@@ -3,7 +3,8 @@ import { redisConnection } from './connection';
 import { prisma } from '../repositories/prisma';
 import { io } from '../server';
 import axios from 'axios';
-import { uploadBuffer, getExtFromUrl } from '../services/gcsService';
+import { getExtFromUrl, uploadBuffer } from '../services/gcsService';
+import { config } from '../config/env';
 
 // Initialize the queue
 export const mediaDownloadQueue = new Queue('mediaDownloadQueue', { connection: redisConnection });
@@ -39,8 +40,8 @@ export const mediaDownloadWorker = new Worker('mediaDownloadQueue', async (job: 
 
     console.log(`[Media Worker] Downloading media for message ${messageId}...`);
 
-    const wahaUrl = process.env.WAHA_URL || 'http://localhost:3001';
-    const wahaApiKey = process.env.WAHA_API_KEY || 'waha_secret_key';
+    const wahaUrl = config.wahaUrl;
+    const wahaApiKey = config.wahaApiKey;
     const downloadUrl = `${wahaUrl}/api/${deviceId}/messages/${messageId}/download`;
     
     const response = await axios.get(downloadUrl, {

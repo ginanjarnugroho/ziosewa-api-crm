@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import fs from 'fs';
 import path from 'path';
-import { prisma } from '../repositories/prisma';
+import { createDevice, findDeviceByIdentifier, findDevicesByTenant, updateDeviceStatus } from '../repositories/deviceRepository';
+import { findFirstTenant } from '../repositories/tenantRepository';
 import { AdapterFactory } from '../services/AdapterFactory';
 import { syncQueue } from '../queues/syncWorker';
 
@@ -23,35 +24,36 @@ export default async function deviceController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
+    // 1. Ambil spesifikasi perangkat dari Request Body
     const { device_id, channel_type, connection_method, phone_number, tenant_id } = request.body as any;
 
-    let device = await prisma.device.findFirst({ where: { deviceIdentifier: device_id } });
+    // 2. Cek apakah perangkat sudah pernah terdaftar di Database
+    let device = await findDeviceByIdentifier(device_id);
 
     if (!device) {
       if (!tenant_id) {
         return reply.status(400).send({ error: "tenant_id is required for new devices" });
       }
-      device = await prisma.device.create({
-        data: {
-          tenantId: tenant_id,
-          deviceIdentifier: device_id,
-          channelType: channel_type,
-          status: 'pairing',
-        }
+      
+      // 3. Jika belum terdaftar, buat perangkat baru dengan status 'pairing'
+      device = await createDevice({
+        tenantId: tenant_id,
+        deviceIdentifier: device_id,
+        channelType: channel_type,
+        status: 'pairing',
       });
     }
 
-    if (device && device.status === 'disconnected') {
-      // Force clean up old corrupted/partial sessions before reconnecting
-
-    }
-
     try {
+      // 4. Inisiasi Adapter (contoh: waha, baileys, telegram)
       const adapter = AdapterFactory.getAdapter(channel_type);
       
-      // Async connect call. QR code will be generated via events and stored in DB.
+      // 5. Panggil fungsi koneksi secara asinkron (Asynchronous Connect)
+      //    Sistem akan mencoba menghasilkan QR code melalui Webhooks / Event Listener 
+      //    yang berjalan di latar belakang (Background Process).
       adapter.connect(device.id, device.deviceIdentifier);
 
+      // 6. Cek konfigurasi untuk melihat apakah QR Code sudah siap disajikan
       const providerConfig = device.providerConfig as any;
       const existingQr = (device.status === 'pairing' && providerConfig && providerConfig.qr) ? providerConfig.qr : null;
 
@@ -85,15 +87,15 @@ export default async function deviceController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     const { device_id } = request.body as any;
-    // Extract tenantId from token (assuming req.user exists from authMiddleware)
     const user = (request as any).user;
 
     try {
-      const device = await prisma.device.findFirst({ 
-        where: { deviceIdentifier: device_id, tenantId: user?.tenantId } 
-      });
+      // 1. Verifikasi Kepemilikan Perangkat
+      const device = await findDeviceByIdentifier(device_id, user?.tenantId);
       if (!device) return reply.status(404).send({ success: false, error: 'Device not found' });
 
+      // 2. Serahkan tugas sinkronisasi histori obrolan ke Background Worker (BullMQ)
+      //    Karena sinkronisasi membutuhkan waktu lama dan rakus sumber daya (Resource Intensive)
       await syncQueue.add('syncDeviceHistory', {
         deviceId: device.id,
         tenantId: device.tenantId,
@@ -122,16 +124,15 @@ export default async function deviceController(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const { device_id, channel_type } = request.body as any;
 
-    const device = await prisma.device.findFirst({ where: { deviceIdentifier: device_id } });
+    // 1. Verifikasi Eksistensi Perangkat
+    const device = await findDeviceByIdentifier(device_id);
     if (!device) return reply.status(404).send({ error: "Device not found" });
 
-    // 1. Update Database
-    await prisma.device.update({
-      where: { id: device.id },
-      data: { status: 'disconnected', providerConfig: { state: 'DISCONNECTED' } }
-    });
+    // 2. Putus Sesi di Database: Ubah status menjadi 'disconnected' 
+    //    agar antarmuka pengguna (UI) segera menutup layar chat
+    await updateDeviceStatus(device.id, 'disconnected', 'DISCONNECTED');
 
-    // 2. Disconnect Socket
+    // 3. Putus Sesi dari sisi Adapter (WAHA / Provider lain)
     const adapter = AdapterFactory.getAdapter(channel_type);
     if (adapter.disconnect) {
       try {
@@ -141,8 +142,17 @@ export default async function deviceController(fastify: FastifyInstance) {
       }
     }
 
-
-
     return reply.send({ status: 'success', message: 'Device disconnected and session cleared' });
+  });
+
+  // GET all devices for tenant
+  fastify.get('/api/v1/devices', async (request, reply) => {
+    try {
+      const tenant = (request as any).tenant || await findFirstTenant();
+      const devices = await findDevicesByTenant(tenant?.id);
+      return { success: true, data: devices };
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: err.message });
+    }
   });
 }

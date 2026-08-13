@@ -5,8 +5,8 @@ export const authMiddleware = async (request: FastifyRequest, reply: FastifyRepl
   if (!request.url.includes('/avatar')) {
     console.log(`[HTTP] ${request.method} ${request.url}`);
   }
-  // Only apply to our protected API endpoints (except internal master endpoints, avatar proxy, and WAHA webhooks)
-  if (request.url.startsWith('/api/v1/') && !request.url.startsWith('/api/v1/internal/') && !request.url.includes('/avatar') && !request.url.startsWith('/api/v1/webhooks/waha')) {
+  // Only apply to our protected API endpoints (except internal master endpoints, avatar proxy, WAHA webhooks, and automation catch webhooks)
+  if (request.url.startsWith('/api/v1/') && !request.url.startsWith('/api/v1/internal/') && !request.url.includes('/avatar') && !request.url.startsWith('/api/v1/webhooks/waha') && !request.url.startsWith('/api/v1/automation/webhooks/catch')) {
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return reply.status(401).send({ success: false, error: 'Missing or invalid Authorization Bearer token' });

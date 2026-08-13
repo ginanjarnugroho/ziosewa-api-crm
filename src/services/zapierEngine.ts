@@ -81,7 +81,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
   });
 
   if (!device) {
-    console.warn('[Zapier Engine] No connected device found to dispatch automation message.');
+    console.warn('[ZioSewa Engine] No connected device found to dispatch automation message.');
   }
 
   const tenantId = payload.tenant_id || device?.tenantId;
@@ -103,7 +103,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
         status: 'CANCELLED'
       }
     });
-    console.log(`[Zapier Engine] Cancelled pending notifications for returned order ${payload.order_id}`);
+    console.log(`[ZioSewa Engine] Cancelled pending notifications for returned order ${payload.order_id}`);
   }
 
   // Retrieve active automation rules for this tenant
@@ -113,7 +113,8 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
       isEnabled: true
     },
     include: {
-      template: true
+      template: true,
+      device: true
     }
   });
 
@@ -131,6 +132,12 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
     }
 
     if (!shouldTrigger) continue;
+
+    // Resolve specific target device for this rule (fallback to default active device)
+    let targetDevice = rule.device;
+    if (!targetDevice || targetDevice.status !== 'connected') {
+      targetDevice = defaultDevice;
+    }
 
     // Calculate scheduled time
     let scheduledTime = new Date();
@@ -163,18 +170,18 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
     // Check if immediate execution (scheduled within 10 seconds of now)
     const isImmediate = Math.abs(scheduledTime.getTime() - Date.now()) < 10000;
 
-    if (isImmediate && device) {
+    if (isImmediate && targetDevice && targetDevice.status === 'connected') {
       // Execute immediately via WahaAdapter
       try {
         const wahaAdapter = new WahaAdapter();
-        const sessId = device.deviceIdentifier;
+        const sessId = targetDevice.id;
         await wahaAdapter.sendMessage(sessId, recipientJid, renderedText);
 
         // Record in ScheduledNotification log as SENT
         const notif = await prisma.scheduledNotification.create({
           data: {
             tenantId,
-            deviceId: device.id,
+            deviceId: targetDevice.id,
             ruleId: rule.id,
             orderId: payload.order_id || null,
             recipient: recipientJid,
@@ -188,11 +195,11 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
         });
         executedRules.push({ ruleId: rule.id, ruleName: rule.name, status: 'SENT', notificationId: notif.id });
       } catch (err: any) {
-        console.error(`[Zapier Engine] Failed to dispatch immediate rule ${rule.name}:`, err);
+        console.error(`[ZioSewa Engine] Failed to dispatch immediate rule ${rule.name}:`, err);
         const notif = await prisma.scheduledNotification.create({
           data: {
             tenantId,
-            deviceId: device?.id || null,
+            deviceId: targetDevice?.id || null,
             ruleId: rule.id,
             orderId: payload.order_id || null,
             recipient: recipientJid,
@@ -211,7 +218,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
       const notif = await prisma.scheduledNotification.create({
         data: {
           tenantId,
-          deviceId: device?.id || null,
+          deviceId: targetDevice?.id || null,
           ruleId: rule.id,
           orderId: payload.order_id || null,
           recipient: recipientJid,

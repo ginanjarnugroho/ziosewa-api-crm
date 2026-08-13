@@ -7,8 +7,10 @@ import { uploadFromUrl, getExtFromUrl } from '../services/gcsService';
 
 export const syncQueue = new Queue('syncQueue', { connection: redisConnection });
 
-const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3001';
-const WAHA_API_KEY = process.env.WAHA_API_KEY || 'waha_secret_key';
+import { config } from '../config/env';
+
+const WAHA_URL = config.wahaUrl;
+const WAHA_API_KEY = config.wahaApiKey;
 
 function getHeaders() {
   return {

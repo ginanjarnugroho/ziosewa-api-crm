@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { config } from '../config/env';
 
 export async function masterAuthMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
@@ -7,7 +8,7 @@ export async function masterAuthMiddleware(request: FastifyRequest, reply: Fasti
   }
 
   const apiKey = authHeader.split(' ')[1];
-  const masterKey = process.env.MASTER_API_KEY;
+  const masterKey = config.masterApiKey;
 
   if (!masterKey) {
     return reply.status(500).send({ success: false, error: 'MASTER_API_KEY is not configured on the server' });

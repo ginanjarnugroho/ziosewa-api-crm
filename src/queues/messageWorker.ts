@@ -5,6 +5,7 @@ import { SendMessagePayload } from '../interfaces/MessagingChannelAdapter';
 import { prisma } from '../repositories/prisma';
 import { io } from '../server';
 import { getSignedUrl } from '../services/gcsService';
+import { normalizeJid } from '../utils/phoneUtils';
 
 export const messageQueue = new Queue('messageQueue', { connection: redisConnection });
 
@@ -17,13 +18,14 @@ export const messageWorker = new Worker('messageQueue', async (job: Job) => {
 
     if (job.name === 'sendMedia') {
       response = await adapter.sendMedia!(deviceId, payload);
+    } else if (job.name === 'sendReaction') {
+      response = await (adapter as any).sendReaction(deviceId, payload);
+      return { success: true }; // Fire and forget for reactions
     } else {
       response = await adapter.sendText(deviceId, payload);
     }
     
     // Attempt to extract messageId from WAHA response
-    // WAHA might return the ID as a string, or an object { _serialized: "...", id: "..." }
-
     let messageId = `temp-${Date.now()}`;
     if (response) {
       if (typeof response.id === 'string') {
@@ -43,6 +45,8 @@ export const messageWorker = new Worker('messageQueue', async (job: Job) => {
       });
     }
 
+    const recipientJid = normalizeJid(payload.to);
+
     // Create ChatMessage in the database so we can track its status
     const device = await prisma.device.findUnique({ where: { id: deviceId } });
     if (device) {
@@ -50,7 +54,7 @@ export const messageWorker = new Worker('messageQueue', async (job: Job) => {
         data: {
           tenantId: device.tenantId,
           deviceId: deviceId,
-          remoteJid: payload.to,
+          remoteJid: recipientJid,
           messageId: messageId,
           isFromMe: true,
           text: payload.caption || payload.message || '',

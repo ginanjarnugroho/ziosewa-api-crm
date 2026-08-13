@@ -1,12 +1,12 @@
 import { Storage } from '@google-cloud/storage';
+import { config } from '../config/env';
 import axios from 'axios';
 import path from 'path';
 
-const bucketName = process.env.GCS_BUCKET!;
+const bucketName = config.gcsBucket;
 
-// Gunakan credentials dari GOOGLE_APPLICATION_CREDENTIALS env variable
 const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  keyFilename: config.googleAppCreds,
 });
 const bucket = storage.bucket(bucketName);
 

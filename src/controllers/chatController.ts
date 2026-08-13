@@ -1,8 +1,29 @@
 import { FastifyInstance } from 'fastify';
-import { prisma } from '../repositories/prisma';
+import axios from 'axios';
 import { mediaDownloadQueue } from '../queues/mediaDownloadWorker';
 import { AdapterFactory } from '../services/AdapterFactory';
 import { getSignedUrl, uploadJson, readJson } from '../services/gcsService';
+import { normalizeJid, formatPhoneNumber } from '../utils/phoneUtils';
+import { messageQueue } from '../queues/messageWorker';
+import { config } from '../config/env';
+
+import { findDeviceByIdentifier } from '../repositories/deviceRepository';
+import { 
+  getLatestChatsWithPagination, 
+  countDistinctChats, 
+  findMessagesByChat, 
+  markMessagesAsRead, 
+  findLatestUnreadMessage, 
+  getMediaGalleryByChat,
+  upsertMessage
+} from '../repositories/chatMessageRepository';
+import { 
+  findContactsByJids, 
+  findContactByJid, 
+  upsertContactProfilePic,
+  upsertContact,
+  findContactByRemoteJidOnly
+} from '../repositories/contactRepository';
 
 export default async function chatController(fastify: FastifyInstance) {
   fastify.get('/api/v1/chats', {
@@ -26,33 +47,17 @@ export default async function chatController(fastify: FastifyInstance) {
     const limit = Number((request.query as any).limit) || 50;
 
     try {
-      // Lookup the internal UUID of the device using the human-readable deviceIdentifier
-      const device = await prisma.device.findFirst({ where: { tenantId: tenant_id, deviceIdentifier: device_id } });
+      // 1. Dapatkan referensi Device
+      const device = await findDeviceByIdentifier(device_id, tenant_id);
       if (!device) return reply.status(404).send({ success: false, error: 'Device not found' });
 
-      // Use Raw SQL to get the latest message per contact efficiently with pagination
       const offset = (page - 1) * limit;
       
-      const latestMessagesRaw: any[] = await prisma.$queryRaw`
-        SELECT * FROM (
-          SELECT *, ROW_NUMBER() OVER(PARTITION BY "remote_jid" ORDER BY "timestamp" DESC) as rn
-          FROM "chat_messages"
-          WHERE "tenant_id" = ${device.tenantId}::uuid AND "device_id" = ${device.id}::uuid
-        ) sub
-        WHERE rn = 1
-        ORDER BY "timestamp" DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+      // 2. Gunakan fungsi repositori (Repository Layer) untuk mengeksekusi Raw SQL
+      const latestMessagesRaw = await getLatestChatsWithPagination(device.tenantId, device.id, limit, offset);
+      const total = await countDistinctChats(device.tenantId, device.id);
 
-      // Also get the total count of distinct chats for pagination metadata
-      const totalCountRaw: any[] = await prisma.$queryRaw`
-        SELECT COUNT(DISTINCT "remote_jid")::int as total
-        FROM "chat_messages"
-        WHERE "tenant_id" = ${device.tenantId}::uuid AND "device_id" = ${device.id}::uuid
-      `;
-      const total = totalCountRaw[0]?.total || 0;
-
-      // Map raw SQL result back to camelCase object like Prisma does
+      // Mapping hasil query Raw SQL PostgreSQL ke dalam bentuk CamelCase objek standar
       const latestMessages = latestMessagesRaw.map(msg => ({
         remoteJid: msg.remote_jid,
         text: msg.text,
@@ -61,14 +66,12 @@ export default async function chatController(fastify: FastifyInstance) {
         status: msg.status
       }));
 
-      // Fetch contact info for these JIDs
-      const contacts = await prisma.contact.findMany({
-        where: { 
-          tenantId: tenant_id, 
-          deviceId: device.id,
-          remoteJid: { in: latestMessages.map(m => m.remoteJid) }
-        }
-      });
+      // 3. Tarik data profil (nama, foto) untuk tiap JID yang sedang dimuat
+      const contacts = await findContactsByJids(
+        tenant_id, 
+        device.id, 
+        latestMessages.map(m => m.remoteJid)
+      );
 
       const contactMap = new Map(contacts.map(c => [c.remoteJid, c]));
 
@@ -79,10 +82,10 @@ export default async function chatController(fastify: FastifyInstance) {
         const contact = contactMap.get(msg.remoteJid);
         let name = contact?.pushName || contact?.verifiedName || null;
 
-        // Group Chat name check: non-blocking background fetch if name is missing
+        // Mengecek nama grup (Group Subject) langsung ke WhatsApp API jika database kita belum menyimpannya
         if (!name && msg.remoteJid.endsWith('@g.us')) {
-          const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3001';
-          const WAHA_API_KEY = process.env.WAHA_API_KEY || 'waha_secret_key';
+          const WAHA_URL = config.wahaUrl;
+          const WAHA_API_KEY = config.wahaApiKey;
           const sessId = device.id || device.deviceIdentifier;
           
           axios.get(`${WAHA_URL}/api/${sessId}/chats/${encodeURIComponent(msg.remoteJid)}`, {
@@ -91,11 +94,7 @@ export default async function chatController(fastify: FastifyInstance) {
           }).then(res => {
             const realGroupName = res.data?.name || res.data?.subject;
             if (realGroupName) {
-              prisma.contact.upsert({
-                where: { deviceId_remoteJid: { deviceId: device.id, remoteJid: msg.remoteJid } },
-                create: { tenantId: device.tenantId, deviceId: device.id, remoteJid: msg.remoteJid, pushName: realGroupName },
-                update: { pushName: realGroupName }
-              }).catch(() => {});
+               upsertContact(device.id, msg.remoteJid, device.tenantId, realGroupName).catch(() => {});
             }
           }).catch(() => {});
         }
@@ -164,13 +163,11 @@ export default async function chatController(fastify: FastifyInstance) {
     const { tenant_id, device_id } = request.query as any;
 
     try {
-      const device = await prisma.device.findFirst({ where: { tenantId: tenant_id, deviceIdentifier: device_id } });
+      const device = await findDeviceByIdentifier(device_id, tenant_id);
       if (!device) return reply.status(404).send({ success: false, error: 'Device not found' });
 
-      // Check DB first
-      const contact = await prisma.contact.findUnique({
-        where: { deviceId_remoteJid: { deviceId: device.id, remoteJid } }
-      });
+      // Periksa cache database terlebih dahulu agar tidak membebani limit API WhatsApp
+      const contact = await findContactByJid(device.id, remoteJid);
 
       if (contact?.profilePic && contact.profilePic.startsWith('http')) {
         try {
@@ -187,23 +184,15 @@ export default async function chatController(fastify: FastifyInstance) {
         return reply.status(404).send({ success: false, error: 'Device is not connected, skipping avatar fetch' });
       }
 
-      // Fetch from WAHA API
+      // Jika tidak ada di lokal DB, maka tarik via WebSocket/Adapter WhatsApp
       const adapter = AdapterFactory.getAdapter(device.channelType) as any;
       if (adapter && typeof adapter.getProfilePicUrl === 'function') {
         const picUrl = await adapter.getProfilePicUrl(device.id, remoteJid);
         if (picUrl) {
-          await prisma.contact.upsert({
-            where: { deviceId_remoteJid: { deviceId: device.id, remoteJid } },
-            create: { tenantId: device.tenantId, deviceId: device.id, remoteJid, profilePic: picUrl },
-            update: { profilePic: picUrl }
-          });
+          await upsertContactProfilePic(device.tenantId, device.id, remoteJid, picUrl);
           return reply.redirect(picUrl);
         } else {
-          await prisma.contact.upsert({
-            where: { deviceId_remoteJid: { deviceId: device.id, remoteJid } },
-            create: { tenantId: device.tenantId, deviceId: device.id, remoteJid, profilePic: 'none' },
-            update: { profilePic: 'none' }
-          });
+          await upsertContactProfilePic(device.tenantId, device.id, remoteJid, 'none');
           return reply.status(404).send({ success: false, error: 'No profile picture' });
         }
       }
@@ -241,24 +230,30 @@ export default async function chatController(fastify: FastifyInstance) {
     const { tenant_id, device_id, limit, cursor } = request.query as any;
 
     try {
-      const device = await prisma.device.findFirst({ where: { tenantId: tenant_id, deviceIdentifier: device_id } });
+      const device = await findDeviceByIdentifier(device_id, tenant_id);
       if (!device) return reply.status(404).send({ success: false, error: 'Device not found' });
 
-      let messages = await prisma.chatMessage.findMany({
-        where: { tenantId: tenant_id, deviceId: device.id, remoteJid },
-        take: Number(limit) || 50,
-        skip: cursor ? 1 : 0,
-        cursor: cursor ? { id: cursor } : undefined,
-        orderBy: [{ timestamp: 'desc' }, { id: 'desc' }]
-      });
+      // Berlangganan (subscribe) status online pengguna yang sedang dichat (Asynchronous fire & forget)
+      try {
+        const WAHA_URL = config.wahaUrl;
+        const WAHA_API_KEY = config.wahaApiKey;
+        axios.post(`${WAHA_URL}/api/${device.id}/presence/${encodeURIComponent(remoteJid)}/subscribe`, {}, {
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Api-Key': WAHA_API_KEY }
+        }).catch(e => console.warn(`[WAHA] Failed to subscribe to presence for ${remoteJid}:`, e.message));
+      } catch (err) {
+        // Abaikan jika error jaringan
+      }
+
+      // Ambil histori pesan dari Database Lokal (di-cache oleh webhooks sebelumnya)
+      let messages = await findMessagesByChat(tenant_id, device.id, remoteJid, Number(limit) || 50, cursor);
 
       // --- LAZY LOADING LOGIC ---
       // If DB is empty or only has the latest message for this chat and we are not paginating (no cursor)
       if (messages.length <= 1 && !cursor) {
         try {
           console.log(`[WAHA API Load] Database empty for ${remoteJid}. Fetching history from WAHA API...`);
-          const WAHA_URL = process.env.WAHA_URL || 'http://localhost:3001';
-          const WAHA_API_KEY = process.env.WAHA_API_KEY || 'waha_secret_key';
+          const WAHA_URL = config.wahaUrl;
+          const WAHA_API_KEY = config.wahaApiKey;
           const fetchLimit = limit ? Number(limit) : 20;
           const wahaUrlParams = `limit=${fetchLimit}&offset=0&downloadMedia=true&sortBy=messageTimestamp&sortOrder=desc&merge=true`;
           const response = await fetch(`${WAHA_URL}/api/${device.id}/chats/${encodeURIComponent(remoteJid)}/messages?${wahaUrlParams}`, {
@@ -301,23 +296,31 @@ export default async function chatController(fastify: FastifyInstance) {
                   }
                 }
 
-                await prisma.chatMessage.upsert({
-                  where: { deviceId_remoteJid_messageId: { deviceId: device.id, remoteJid, messageId: msg.id } },
-                  create: {
-                    tenantId: tenant_id,
-                    deviceId: device.id,
-                    remoteJid,
-                    messageId: msg.id,
-                    isFromMe,
-                    text: msg.body || '',
-                    messageType: finalMessageType,
-                    mediaUrl: initialMediaUrl,
-                    mediaPath: initialMediaPath,
-                    timestamp: new Date(msg.timestamp ? msg.timestamp * 1000 : Date.now()),
-                status: initialStatus as any
-              },
-              update: {} 
-            });
+                // Extract quoted message ID
+                let replyToMessageId = null;
+                if (msg.hasQuotedMsg || msg.quotedMsgId || msg.quoted) {
+                  replyToMessageId = msg.quotedMsgId || msg.quoted?.id || msg._data?.quotedStanzaID || msg._data?.Message?.extendedTextMessage?.contextInfo?.stanzaId || null;
+                  if (typeof replyToMessageId === 'string' && replyToMessageId.includes('_')) {
+                     const parts = replyToMessageId.split('_');
+                     replyToMessageId = parts[parts.length - 1];
+                  }
+                }
+
+                // Simpan ke DB secara atomic (Repository Layer)
+                await upsertMessage({
+                  tenantId: tenant_id,
+                  deviceId: device.id,
+                  remoteJid,
+                  messageId: msg.id,
+                  isFromMe,
+                  text: msg.body || '',
+                  messageType: finalMessageType as any,
+                  mediaUrl: initialMediaUrl,
+                  mediaPath: initialMediaPath,
+                  replyToMessageId: replyToMessageId,
+                  timestamp: new Date(msg.timestamp ? msg.timestamp * 1000 : Date.now()),
+                  status: initialStatus as any
+                });
 
             // Trigger background media download if it has media and we don't already have a permanent URL in mediaPath
             if (finalMessageType === 'media' && !initialMediaPath) {
@@ -332,12 +335,8 @@ export default async function chatController(fastify: FastifyInstance) {
           
           console.log(`[WAHA API Load] Successfully saved ${wahaMessages.length} messages from WAHA API into local CRM Database.`);
 
-          // Refetch from DB after upserting
-          messages = await prisma.chatMessage.findMany({
-            where: { tenantId: tenant_id, deviceId: device.id, remoteJid },
-            take: Number(limit) || 50,
-            orderBy: { timestamp: 'desc' }
-          });
+          // Ambil kembali (Refetch) hasil dari Local Database setelah WAHA tersinkronisasi
+          messages = await findMessagesByChat(tenant_id, device.id, remoteJid, Number(limit) || 50, cursor);
 
         } catch (lazyErr: any) {
           console.warn(`[WAHA API Load] Failed to fetch WAHA messages for ${remoteJid}:`, lazyErr.message);
@@ -392,21 +391,15 @@ export default async function chatController(fastify: FastifyInstance) {
     const { device_id } = request.body as any;
     
     try {
-      const device = await prisma.device.findFirst({ where: { deviceIdentifier: device_id } });
+      const device = await findDeviceByIdentifier(device_id);
       if (!device) return reply.status(404).send({ success: false, error: 'Device not found' });
 
-      // Always update DB status to 'read' — this is the primary action
-      await prisma.chatMessage.updateMany({
-        where: { deviceId: device.id, remoteJid, isFromMe: false, status: { not: 'read' } },
-        data: { status: 'read' }
-      });
+      // Pastikan pesan yang belum dibaca (unread) ditandai sebagai telah dibaca di Database kita
+      await markMessagesAsRead(device.id, remoteJid);
 
-      // Best-effort: try to send WA read receipt (non-blocking)
+      // Usaha ringan (Best-effort): Kirim tanda Read Receipt (Centang Biru) ke server WA
       if (device.status !== 'disconnected') {
-        const latestMsg = await prisma.chatMessage.findFirst({
-          where: { deviceId: device.id, remoteJid, isFromMe: false },
-          orderBy: { timestamp: 'desc' }
-        });
+        const latestMsg = await findLatestUnreadMessage(device.id, remoteJid);
         
         if (latestMsg) {
           try {
@@ -426,6 +419,86 @@ export default async function chatController(fastify: FastifyInstance) {
       reply.status(500);
       return { success: false, error: err.message };
     }
+  });
+
+  fastify.post('/api/v1/chats/:remoteJid/presence/subscribe', {
+    schema: {
+      description: 'Subscribe to presence updates for a chat',
+      tags: ['Chats'],
+      params: {
+        type: 'object',
+        required: ['remoteJid'],
+        properties: { remoteJid: { type: 'string' } }
+      },
+      body: {
+        type: 'object',
+        required: ['tenant_id', 'device_id'],
+        properties: {
+          tenant_id: { type: 'string' },
+          device_id: { type: 'string' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const { remoteJid } = request.params as any;
+    const { tenant_id, device_id } = request.body as any;
+
+    try {
+      const device = await findDeviceByIdentifier(device_id, tenant_id);
+      if (!device) return reply.status(404).send({ error: 'Device not found' });
+
+      const WAHA_URL = config.wahaUrl;
+      const WAHA_API_KEY = config.wahaApiKey;
+      
+      await axios.post(`${WAHA_URL}/api/${device.id}/presence/${encodeURIComponent(remoteJid)}/subscribe`, {}, {
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Api-Key': WAHA_API_KEY }
+      });
+      return { success: true };
+    } catch (err: any) {
+      console.warn(`[WAHA] Presence subscribe failed for ${remoteJid}:`, err.message);
+      return { success: false, error: err.message };
+    }
+  });
+
+  fastify.post('/api/v1/chats/:remoteJid/messages/:messageId/reaction', {
+    schema: {
+      description: 'React to a message',
+      tags: ['Chats'],
+      params: {
+        type: 'object',
+        required: ['remoteJid', 'messageId'],
+        properties: {
+          remoteJid: { type: 'string' },
+          messageId: { type: 'string' }
+        }
+      },
+      body: {
+        type: 'object',
+        required: ['tenant_id', 'device_id', 'emoji'],
+        properties: {
+          tenant_id: { type: 'string' },
+          device_id: { type: 'string' },
+          emoji: { type: 'string', description: 'Emoji character, or empty string to remove' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const { remoteJid, messageId } = request.params as any;
+    const { tenant_id, device_id, emoji } = request.body as any;
+
+    const device = await findDeviceByIdentifier(device_id, tenant_id);
+    if (!device) return reply.status(404).send({ error: 'Device not found' });
+
+    const toJid = normalizeJid(remoteJid);
+
+    // Enqueue message
+    await messageQueue.add('sendReaction', {
+      deviceId: device.id,
+      channelType: device.channelType,
+      payload: { to: toJid, messageId, emoji }
+    });
+
+    return { success: true };
   });
 
   fastify.get('/api/v1/chats/:remoteJid/profile-picture', {
@@ -453,7 +526,7 @@ export default async function chatController(fastify: FastifyInstance) {
     const { tenant_id, device_id } = request.query as any;
 
     try {
-      const device = await prisma.device.findFirst({ where: { tenantId: tenant_id, deviceIdentifier: device_id } });
+      const device = await findDeviceByIdentifier(device_id, tenant_id);
       if (!device) return reply.status(404).send({ success: false, error: 'Device not found' });
 
       if (device.status === 'disconnected') {
@@ -502,9 +575,8 @@ export default async function chatController(fastify: FastifyInstance) {
       const gcsPath = `contacts/${remoteJid}/profile.json`;
       const profileData = await readJson(gcsPath) || {};
       
-      const contact = await prisma.contact.findFirst({
-        where: { remoteJid }
-      });
+      // Muat informasi profil lokal (dari file json dan db)
+      const contact = await findContactByRemoteJidOnly(remoteJid);
 
       return {
         success: true,
@@ -551,14 +623,8 @@ export default async function chatController(fastify: FastifyInstance) {
   fastify.get('/api/v1/chats/:remoteJid/media-gallery', async (request, reply) => {
     try {
       const { remoteJid } = request.params as any;
-      const mediaMessages = await prisma.chatMessage.findMany({
-        where: {
-          remoteJid,
-          messageType: 'media'
-        },
-        orderBy: { timestamp: 'desc' },
-        take: 100
-      });
+      // Muat kumpulan galeri gambar dari riwayat chat
+      const mediaMessages = await getMediaGalleryByChat(remoteJid, 100);
 
       return {
         success: true,
@@ -572,7 +638,7 @@ export default async function chatController(fastify: FastifyInstance) {
 
 function formatPhoneNumber(remoteJid: string): string {
   if (!remoteJid || remoteJid.endsWith('@g.us')) return remoteJid;
-  const digits = remoteJid.split('@')[0].replace(/\D/g, '');
+  const digits = remoteJid.split('@')[0].split(':')[0].replace(/\D/g, '');
   if (!digits) return remoteJid;
 
   if (digits.startsWith('62')) {
