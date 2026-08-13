@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Install OS dependencies required for some native modules
-RUN apk add --no-cache python3 make g++ 
+# Install OS dependencies required for some native modules and Prisma
+RUN apk add --no-cache python3 make g++ openssl
 
 # Set working directory
 WORKDIR /app
