@@ -20,6 +20,7 @@ import outboxController from './controllers/outboxController';
 import { startAutomationScheduler } from './queues/automationWorker';
 import './queues/mediaDownloadWorker'; // Initialize background media downloader
 import { bootstrapDatabase } from './utils/bootstrap';
+import { config } from './config/env';
 
 const server = Fastify({
   logger: true,
@@ -144,7 +145,7 @@ const start = async () => {
       }
     }
 
-    await server.listen({ port: 3000, host: '0.0.0.0' });
+    await server.listen({ port: config.port, host: '0.0.0.0' });
   } catch (err) {
     server.log.error(err);
     process.exit(1);
