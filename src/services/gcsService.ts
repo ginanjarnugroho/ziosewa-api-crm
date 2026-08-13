@@ -3,11 +3,16 @@ import { config } from '../config/env';
 import axios from 'axios';
 import path from 'path';
 
+import * as fs from 'fs';
+
 const bucketName = config.gcsBucket;
 
-const storage = new Storage({
-  keyFilename: config.googleAppCreds,
-});
+const storageOptions: any = {};
+if (config.googleAppCreds && fs.existsSync(config.googleAppCreds)) {
+  storageOptions.keyFilename = config.googleAppCreds;
+}
+
+const storage = new Storage(storageOptions);
 const bucket = storage.bucket(bucketName);
 
 /**
@@ -91,13 +96,18 @@ export async function getSignedUrl(publicUrlOrPath: string): Promise<string> {
     destPath = destPath.substring(`${bucketName}/`.length);
   }
 
-  const file = bucket.file(destPath);
-  const [url] = await file.getSignedUrl({
-    version: 'v4',
-    action: 'read',
-    expires: Date.now() + 60 * 60 * 1000, // 1 hour
-  });
-  return url;
+  try {
+    const file = bucket.file(destPath);
+    const [url] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + 60 * 60 * 1000, // 1 hour
+    });
+    return url;
+  } catch (err) {
+    console.warn(`[GCS] Failed to sign URL for ${destPath}, falling back to public URL:`, err);
+    return `https://storage.googleapis.com/${bucketName}/${destPath}`;
+  }
 }
 
 /**
