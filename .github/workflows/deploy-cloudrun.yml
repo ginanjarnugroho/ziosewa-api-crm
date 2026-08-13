@@ -29,7 +29,7 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           # Define image name based on Artifact Registry (Jakarta region)
-          IMAGE_NAME="asia-southeast2-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ziosewa-crm/api:${{ github.sha }}"
+          IMAGE_NAME="asia-southeast2-docker.pkg.dev/${{ env.GCP_PROJECT }}/ziosewa-crm/api:${{ github.sha }}"
           
           # Build the Docker image
           docker build -t $IMAGE_NAME .
