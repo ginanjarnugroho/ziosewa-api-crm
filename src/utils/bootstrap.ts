@@ -1,5 +1,4 @@
 import { prisma } from '../repositories/prisma';
-import { startAutomationScheduler } from '../queues/automationWorker';
 
 export async function bootstrapDatabase() {
   // Auto-fix historical synced messages stuck on 'sent'
@@ -221,7 +220,7 @@ export async function bootstrapDatabase() {
     }
 
     // Start background automation scheduler for scheduled WhatsApp notifications
-    startAutomationScheduler(30000);
+    
   } catch (e) {
     console.error('[Auto-Fix Error]', e);
   }

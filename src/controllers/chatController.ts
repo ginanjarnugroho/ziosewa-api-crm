@@ -1,10 +1,9 @@
+import { CloudTasksService } from '../services/CloudTasksService';
 import { FastifyInstance } from 'fastify';
 import axios from 'axios';
-import { mediaDownloadQueue } from '../queues/mediaDownloadWorker';
 import { AdapterFactory } from '../services/AdapterFactory';
 import { getSignedUrl, uploadJson, readJson } from '../services/gcsService';
 import { normalizeJid, formatPhoneNumber } from '../utils/phoneUtils';
-import { messageQueue } from '../queues/messageWorker';
 import { config } from '../config/env';
 
 import { findDeviceByIdentifier } from '../repositories/deviceRepository';
@@ -324,7 +323,7 @@ export default async function chatController(fastify: FastifyInstance) {
 
             // Trigger background media download if it has media and we don't already have a permanent URL in mediaPath
             if (finalMessageType === 'media' && !initialMediaPath) {
-              mediaDownloadQueue.add('downloadMedia', {
+              CloudTasksService.enqueueTask('/api/v1/internal/tasks/download-media', {
                 tenantId: tenant_id,
                 deviceId: device.id,
                 remoteJid,
@@ -492,7 +491,7 @@ export default async function chatController(fastify: FastifyInstance) {
     const toJid = normalizeJid(remoteJid);
 
     // Enqueue message
-    await messageQueue.add('sendReaction', {
+    await CloudTasksService.enqueueTask('/api/v1/internal/tasks/send-reaction', {
       deviceId: device.id,
       channelType: device.channelType,
       payload: { to: toJid, messageId, emoji }

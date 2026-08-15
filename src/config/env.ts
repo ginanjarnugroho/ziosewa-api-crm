@@ -14,6 +14,9 @@ export const config = {
   
   // Redis / Upstash Config
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+
+  // Google Cloud Tasks
+  cloudTasksQueuePath: process.env.CLOUD_TASKS_QUEUE_PATH || '',
   
   // Google Cloud Storage Config
   gcsBucket: process.env.GCS_BUCKET || '',

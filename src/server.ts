@@ -17,8 +17,9 @@ import wahaWebhookController from './controllers/wahaWebhookController';
 import webhookCatchController from './controllers/webhookCatchController';
 import automationRuleController from './controllers/automationRuleController';
 import outboxController from './controllers/outboxController';
-import { startAutomationScheduler } from './queues/automationWorker';
-import './queues/mediaDownloadWorker'; // Initialize background media downloader
+import templateController from './controllers/templateController';
+import broadcastController from './controllers/broadcastController';
+import taskRoutes from './routes/internal/taskRoutes';
 import { bootstrapDatabase } from './utils/bootstrap';
 import { config } from './config/env';
 
@@ -108,9 +109,12 @@ server.register(chatController);
 server.register(contactController);
 server.register(tenantController);
 server.register(wahaWebhookController);
+  server.register(taskRoutes);
 server.register(webhookCatchController);
 server.register(automationRuleController);
 server.register(outboxController);
+server.register(templateController);
+server.register(broadcastController);
 
 // Graceful shutdown helper
 const closeListeners = ['SIGINT', 'SIGTERM'];

@@ -1,10 +1,10 @@
+import { CloudTasksService } from '../services/CloudTasksService';
 import { FastifyInstance } from 'fastify';
 import fs from 'fs';
 import path from 'path';
 import { createDevice, findDeviceByIdentifier, findDevicesByTenant, updateDeviceStatus } from '../repositories/deviceRepository';
 import { findFirstTenant } from '../repositories/tenantRepository';
 import { AdapterFactory } from '../services/AdapterFactory';
-import { syncQueue } from '../queues/syncWorker';
 
 export default async function deviceController(fastify: FastifyInstance) {
   fastify.post('/api/v1/device/connect', {
@@ -96,7 +96,7 @@ export default async function deviceController(fastify: FastifyInstance) {
 
       // 2. Serahkan tugas sinkronisasi histori obrolan ke Background Worker (BullMQ)
       //    Karena sinkronisasi membutuhkan waktu lama dan rakus sumber daya (Resource Intensive)
-      await syncQueue.add('syncDeviceHistory', {
+      await CloudTasksService.enqueueTask('/api/v1/internal/tasks/sync-history', {
         deviceId: device.id,
         tenantId: device.tenantId,
         deviceIdentifier: device.deviceIdentifier

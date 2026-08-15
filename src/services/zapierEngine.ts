@@ -1,3 +1,4 @@
+import { CloudTasksService } from './CloudTasksService';
 import { prisma } from '../repositories/prisma';
 import { WahaAdapter } from '../adapters/WahaAdapter';
 

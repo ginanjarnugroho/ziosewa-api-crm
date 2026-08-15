@@ -48,7 +48,10 @@ export async function handleMessageAny(payload: any, device: any, deviceId: stri
 
   // WhatsApp terkadang menggunakan akhiran @lid (masking nomor) pada kontak bisnis (WhatsApp Business).
   // Bagian ini mencari nomor WhatsApp aslinya (SenderAlt) jika ada, asalkan bukan grup.
-  let rawRemoteJid = msg.chatId || msg.from;
+  let rawRemoteJid = msg.chatId;
+  if (!rawRemoteJid) {
+    rawRemoteJid = isFromMe ? msg.to : msg.from;
+  }
   const isGroup = rawRemoteJid?.endsWith('@g.us') || (msg.from && msg.from.endsWith('@g.us')) || (msg.chatId && msg.chatId.endsWith('@g.us')) || msg._data?.Info?.IsGroup || false;
   
   if (!isGroup && rawRemoteJid?.includes('@lid')) {

@@ -1,7 +1,7 @@
+import { CloudTasksService } from '../services/CloudTasksService';
 import { FastifyInstance } from 'fastify';
 import { findDeviceByIdentifier } from '../repositories/deviceRepository';
 import { createMessageLog } from '../repositories/messageLogRepository';
-import { messageQueue } from '../queues/messageWorker';
 import { AdapterFactory } from '../services/AdapterFactory';
 import path from 'path';
 import { uploadBuffer } from '../services/gcsService';
@@ -55,7 +55,7 @@ export default async function messageController(fastify: FastifyInstance) {
 
     // 5. Masukkan pesan ke dalam Antrean Background (BullMQ / Redis)
     //    agar pengiriman pesan tidak memblokir respon HTTP (Non-blocking)
-    const job = await messageQueue.add('sendText', {
+    const job = await CloudTasksService.enqueueTask('/api/v1/internal/tasks/send-text', {
       deviceId: device.id,
       channelType: device.channelType,
       payload: { to: toJid, message, idempotency_key, reply_to },
@@ -66,7 +66,7 @@ export default async function messageController(fastify: FastifyInstance) {
       status: "success",
       message: "Message successfully enqueued",
       data: {
-        queue_id: job.id,
+        queue_id: job,
         estimated_delay_ms: 1500
       }
     });
@@ -120,7 +120,7 @@ export default async function messageController(fastify: FastifyInstance) {
       const gcsUrl = await uploadBuffer(buffer, gcsPath, data.mimetype);
 
       // 5. Masukkan tugas pengiriman Media ini ke dalam Antrean (Queue)
-      const job = await messageQueue.add('sendMedia', {
+      const job = await CloudTasksService.enqueueTask('/api/v1/internal/tasks/send-media', {
         tenantId: device.tenantId,
         deviceId: device.id,
         channelType,
@@ -142,7 +142,7 @@ export default async function messageController(fastify: FastifyInstance) {
         success: true,
         message: "Media message successfully enqueued",
         data: {
-          queue_id: job.id,
+          queue_id: job,
           gcs_url: gcsUrl
         }
       });
