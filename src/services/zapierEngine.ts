@@ -72,7 +72,10 @@ export function enforceQuietHours(scheduledDate: Date, startStr: string = '20:00
 
 export async function processIncomingWebhook(payload: WebhookPayload) {
   // Normalize phone number to @c.us format
-  const rawDigits = payload.customer_phone.replace(/\D/g, '');
+  let rawDigits = payload.customer_phone.replace(/\D/g, '');
+  if (rawDigits.startsWith('0')) {
+    rawDigits = '62' + rawDigits.slice(1);
+  }
   const recipientJid = rawDigits.endsWith('@c.us') ? rawDigits : `${rawDigits}@c.us`;
 
   // Find active device for sending
@@ -137,7 +140,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
     // Resolve specific target device for this rule (fallback to default active device)
     let targetDevice = rule.device;
     if (!targetDevice || targetDevice.status !== 'connected') {
-      targetDevice = defaultDevice;
+      targetDevice = device;
     }
 
     // Calculate scheduled time
@@ -177,6 +180,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
         const wahaAdapter = new WahaAdapter();
         const sessId = targetDevice.id;
         await wahaAdapter.sendMessage(sessId, recipientJid, renderedText);
+        console.log(`[ZioSewa Engine] Immediate rule ${rule.name} executed successfully via device ${sessId}`);
 
         // Record in ScheduledNotification log as SENT
         const notif = await prisma.scheduledNotification.create({
@@ -215,7 +219,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
         executedRules.push({ ruleId: rule.id, ruleName: rule.name, status: 'FAILED', error: err.message, notificationId: notif.id });
       }
     } else {
-      // Queue in ScheduledNotification table for BullMQ Cron Worker
+      // Queue in ScheduledNotification table
       const notif = await prisma.scheduledNotification.create({
         data: {
           tenantId,
@@ -230,6 +234,18 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
           metadata: payload.data || {}
         }
       });
+
+      // If Cloud Tasks is configured, schedule serverless execution
+      try {
+        await CloudTasksService.enqueueTask(
+          '/api/v1/internal/tasks/process-automation',
+          { notificationId: notif.id, deviceId: targetDevice?.id },
+          scheduledTime
+        );
+      } catch (ctErr: any) {
+        console.log('[ZioSewa Engine] Cloud Tasks scheduling skipped/fallback to DB poller:', ctErr.message);
+      }
+
       executedRules.push({ ruleId: rule.id, ruleName: rule.name, status: 'SCHEDULED', scheduledAt: scheduledTime, notificationId: notif.id });
     }
   }
