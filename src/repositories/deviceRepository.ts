@@ -17,7 +17,7 @@ export async function updateDeviceStatus(id: string, status: string, providerSta
   return prisma.device.update({
     where: { id },
     data: { 
-      status, 
+      status: status as any, 
       providerConfig: { state: providerState } 
     }
   });
@@ -41,7 +41,7 @@ export async function findDeviceByIdentifier(deviceIdentifier: string, tenantId?
  */
 export async function createDevice(data: { tenantId: string, deviceIdentifier: string, channelType: string, status: string }) {
   return prisma.device.create({
-    data
+    data: data as any
   });
 }
 

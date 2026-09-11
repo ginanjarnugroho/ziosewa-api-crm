@@ -16,6 +16,6 @@ export async function createMessageLog(data: {
   status: string;
 }) {
   return prisma.messageLog.create({
-    data
+    data: data as any
   });
 }
