@@ -143,9 +143,9 @@ const start = async () => {
       server.log.info(`Auto-reconnecting device: ${device.id}`);
       try {
         const adapter = AdapterFactory.getAdapter(device.channelType);
-        adapter.connect(device.id, {}).catch(e => server.log.error(`Failed to connect device ${device.id}:`, e));
-      } catch (err) {
-        server.log.error(`Adapter error for device ${device.id}:`, err);
+        adapter.connect(device.id, device.deviceIdentifier).catch(e => server.log.error(e, `Failed to connect device ${device.id}`));
+      } catch (err: any) {
+        server.log.error(err, `Adapter error for device ${device.id}`);
       }
     }
 
