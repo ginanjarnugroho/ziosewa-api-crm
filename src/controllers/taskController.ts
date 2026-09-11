@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { AdapterFactory } from '../services/AdapterFactory';
+import { WahaAdapter } from '../adapters/WahaAdapter';
 import { prisma } from '../repositories/prisma';
 import { io } from '../server';
 import { upsertMessage } from '../repositories/chatMessageRepository';
@@ -120,7 +121,46 @@ export default {
   },
 
   async handleProcessAutomation(request: FastifyRequest, reply: FastifyReply) {
-    // Placeholder for automation logic
-    return reply.send({ success: true });
+    const { notificationId, deviceId } = request.body as any;
+    try {
+      console.log(`[Cloud Tasks Automation] Processing notificationId: ${notificationId}, deviceId: ${deviceId}`);
+      if (notificationId) {
+        const notif = await prisma.scheduledNotification.findUnique({ where: { id: notificationId } });
+        if (!notif || notif.status !== 'PENDING') {
+          return reply.send({ success: true, message: 'Notification already processed or cancelled' });
+        }
+
+        const activeDevice = deviceId
+          ? await prisma.device.findUnique({ where: { id: deviceId } })
+          : await prisma.device.findFirst({ where: { status: 'connected' }, orderBy: { updatedAt: 'desc' } });
+
+        if (!activeDevice || activeDevice.status !== 'connected') {
+          return reply.status(400).send({ success: false, error: 'No active WhatsApp device available' });
+        }
+
+        const wahaAdapter = new WahaAdapter();
+        await wahaAdapter.sendMessage(activeDevice.id, notif.recipient, notif.renderedText);
+
+        await prisma.scheduledNotification.update({
+          where: { id: notif.id },
+          data: { status: 'SENT', sentAt: new Date(), lastError: null }
+        });
+
+        console.log(`[Cloud Tasks Automation] Notification ${notif.id} sent successfully via device ${activeDevice.id}`);
+
+        return reply.send({ success: true, message: 'Automation notification sent via Cloud Tasks' });
+      }
+
+      return reply.send({ success: true });
+    } catch (error: any) {
+      console.error('[Cloud Tasks Automation Error]', error?.message || error);
+      if (notificationId) {
+        await prisma.scheduledNotification.update({
+          where: { id: notificationId },
+          data: { status: 'FAILED', lastError: error?.message || 'Cloud Tasks dispatch failed' }
+        });
+      }
+      return reply.status(500).send({ success: false, error: error?.message || 'Failed' });
+    }
   }
 };
