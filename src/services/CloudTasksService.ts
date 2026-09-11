@@ -20,7 +20,7 @@ export class CloudTasksService {
     // Since this is a serverless environment, the Cloud Run instance URL needs to be injected or retrieved
     // In production, this should be the public URL of your API
     // For local dev with ngrok, set CLOUD_RUN_URL in .env
-    const baseUrl = process.env.CLOUD_RUN_URL || 'http://localhost:3000';
+    const baseUrl = process.env.CLOUD_RUN_URL;
     const url = `${baseUrl}${urlPath}`;
 
     const task: any = {
@@ -46,8 +46,7 @@ export class CloudTasksService {
         task,
       };
       const [response] = await this.client.createTask(request);
-      console.log(`[CloudTasks] Created task ${response.name}`);
-      return response.name;
+      return response.name || null;
     } catch (error) {
       console.error('[CloudTasks] Error creating task:', error);
       throw error;
