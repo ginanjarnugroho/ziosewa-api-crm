@@ -3,7 +3,7 @@ import { FastifyInstance } from 'fastify';
 import axios from 'axios';
 import { AdapterFactory } from '../services/AdapterFactory';
 import { getSignedUrl, uploadJson, readJson } from '../services/gcsService';
-import { normalizeJid, formatPhoneNumber } from '../utils/phoneUtils';
+import { normalizeJid } from '../utils/phoneUtils';
 import { config } from '../config/env';
 
 import { findDeviceByIdentifier } from '../repositories/deviceRepository';

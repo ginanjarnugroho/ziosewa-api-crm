@@ -4,7 +4,6 @@ import axios from 'axios';
 import { io } from '../server';
 import { uploadFromUrl, getExtFromUrl, getSignedUrl } from '../services/gcsService';
 import QRCode from 'qrcode';
-import axios from 'axios';
 import { config } from '../config/env';
 
 const WAHA_URL = config.wahaUrl;
