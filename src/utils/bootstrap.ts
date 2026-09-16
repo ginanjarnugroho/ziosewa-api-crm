@@ -48,8 +48,13 @@ export async function bootstrapDatabase() {
       `);
       await prisma.$executeRawUnsafe(`
         DO $$ BEGIN
-            CREATE TYPE "OffsetDirection" AS ENUM ('IMMEDIATE', 'BEFORE', 'AFTER');
+            CREATE TYPE "OffsetDirection" AS ENUM ('IMMEDIATE', 'BEFORE', 'AFTER', 'FIXED_TIME');
         EXCEPTION WHEN duplicate_object THEN null; END $$;
+      `);
+      await prisma.$executeRawUnsafe(`
+        DO $$ BEGIN
+            ALTER TYPE "OffsetDirection" ADD VALUE IF NOT EXISTS 'FIXED_TIME';
+        EXCEPTION WHEN OTHERS THEN null; END $$;
       `);
       await prisma.$executeRawUnsafe(`
         DO $$ BEGIN
@@ -114,6 +119,8 @@ export async function bootstrapDatabase() {
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "scheduled_notifications_status_scheduled_at_idx" ON "scheduled_notifications"("status", "scheduled_at");`);
       await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "scheduled_notifications_order_id_idx" ON "scheduled_notifications"("order_id");`);
       await prisma.$executeRawUnsafe(`ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "device_id" UUID;`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "base_date_key" VARCHAR;`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "fixed_time" VARCHAR;`);
 
       console.log('[Auto-Fix] Successfully verified / created automation database tables.');
     } catch (e) {

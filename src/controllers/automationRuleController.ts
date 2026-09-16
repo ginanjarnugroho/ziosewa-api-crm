@@ -94,6 +94,10 @@ export default async function automationRuleController(fastify: FastifyInstance)
           r.offset_value as "offsetValue",
           r.offset_unit as "offsetUnit",
           r.offset_direction as "offsetDirection",
+          r.base_date_key as "baseDateKey",
+          r.base_date_key as "base_date_key",
+          r.fixed_time as "fixedTime",
+          r.fixed_time as "fixed_time",
           r.quiet_hours_start as "quietHoursStart",
           r.quiet_hours_end as "quietHoursEnd",
           r.template_id as "templateId",
@@ -131,6 +135,10 @@ export default async function automationRuleController(fastify: FastifyInstance)
         offset_value,
         offset_unit,
         offset_direction,
+        base_date_key,
+        baseDateKey,
+        fixed_time,
+        fixedTime,
         quiet_hours_start,
         quiet_hours_end,
         template_id,
@@ -141,6 +149,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
       if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
 
       const validDeviceId = (device_id && typeof device_id === 'string' && device_id.trim() !== '') ? device_id.trim() : null;
+      const targetBaseDateKey = base_date_key !== undefined ? base_date_key : baseDateKey || null;
+      const targetFixedTime = fixed_time !== undefined ? fixed_time : fixedTime || null;
 
       try {
         const rule = await prisma.automationRule.create({
@@ -153,6 +163,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
             offsetValue: Number(offset_value) || 0,
             offsetUnit: offset_unit || 'HOURS',
             offsetDirection: offset_direction || 'IMMEDIATE',
+            baseDateKey: targetBaseDateKey,
+            fixedTime: targetFixedTime,
             quietHoursStart: quiet_hours_start || '20:00',
             quietHoursEnd: quiet_hours_end || '08:00',
             templateId: template_id,
@@ -171,6 +183,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
             offsetValue: Number(offset_value) || 0,
             offsetUnit: offset_unit || 'HOURS',
             offsetDirection: offset_direction || 'IMMEDIATE',
+            baseDateKey: targetBaseDateKey,
+            fixedTime: targetFixedTime,
             quietHoursStart: quiet_hours_start || '20:00',
             quietHoursEnd: quiet_hours_end || '08:00',
             templateId: template_id,
@@ -205,6 +219,10 @@ export default async function automationRuleController(fastify: FastifyInstance)
         offset_value,
         offset_unit,
         offset_direction,
+        base_date_key,
+        baseDateKey,
+        fixed_time,
+        fixedTime,
         quiet_hours_start,
         quiet_hours_end,
         template_id,
@@ -218,6 +236,12 @@ export default async function automationRuleController(fastify: FastifyInstance)
       if (offset_value !== undefined) updateData.offsetValue = Number(offset_value);
       if (offset_unit !== undefined) updateData.offsetUnit = offset_unit;
       if (offset_direction !== undefined) updateData.offsetDirection = offset_direction;
+      if (base_date_key !== undefined || baseDateKey !== undefined) {
+        updateData.baseDateKey = base_date_key !== undefined ? base_date_key : baseDateKey;
+      }
+      if (fixed_time !== undefined || fixedTime !== undefined) {
+        updateData.fixedTime = fixed_time !== undefined ? fixed_time : fixedTime;
+      }
       if (quiet_hours_start !== undefined) updateData.quietHoursStart = quiet_hours_start;
       if (quiet_hours_end !== undefined) updateData.quietHoursEnd = quiet_hours_end;
       if (template_id !== undefined) updateData.templateId = template_id;

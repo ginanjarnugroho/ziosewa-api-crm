@@ -256,7 +256,7 @@ export default async function chatController(fastify: FastifyInstance) {
           const fetchLimit = limit ? Number(limit) : 20;
           const wahaUrlParams = `limit=${fetchLimit}&offset=0&downloadMedia=true&sortBy=messageTimestamp&sortOrder=desc&merge=true`;
           const response = await fetch(`${WAHA_URL}/api/${device.id}/chats/${encodeURIComponent(remoteJid)}/messages?${wahaUrlParams}`, {
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Api-Key': WAHA_API_KEY }
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Api-Key': WAHA_API_KEY || '' }
           });
           
           const wahaMessages = await response.json() || [];

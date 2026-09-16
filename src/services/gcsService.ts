@@ -5,7 +5,7 @@ import path from 'path';
 
 import * as fs from 'fs';
 
-const bucketName = config.gcsBucket;
+const bucketName = config.gcsBucket || '';
 
 const storageOptions: any = {};
 if (config.googleAppCreds && fs.existsSync(config.googleAppCreds)) {

@@ -32,6 +32,7 @@ export function compileTemplateText(templateText: string, data: Record<string, a
     '{tgl_acara}': data.tgl_acara || '-',
     '{tgl_ambil}': data.tgl_ambil || '-',
     '{tgl_kembali}': data.tgl_kembali || '-',
+    '{jam_kembali}': data.jam_kembali || '-',
     '{total_bayar}': data.total_bayar || '-',
     '{sisa_tagihan}': data.sisa_tagihan || '-',
     '{alamat_toko}': data.alamat_toko || '-'
@@ -49,6 +50,33 @@ export function compileTemplateText(templateText: string, data: Record<string, a
   }
 
   return result;
+}
+
+export function parseBaseDate(val: any, fallbackDate?: Date): Date | null {
+  if (!val) return fallbackDate || null;
+  if (val instanceof Date && !isNaN(val.getTime())) return val;
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? (fallbackDate || null) : d;
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) return parsed;
+
+    // Handle Indonesian or custom date string like "10 Aug 2026" or "12 Aug 2026 18:00"
+    const monthsMap: Record<string, string> = {
+      'Jan': 'Jan', 'Feb': 'Feb', 'Mar': 'Mar', 'Apr': 'Apr', 'Mei': 'May', 'Jun': 'Jun',
+      'Jul': 'Jul', 'Agu': 'Aug', 'Agt': 'Aug', 'Sep': 'Sep', 'Okt': 'Oct', 'Nov': 'Nov', 'Des': 'Dec'
+    };
+    let normalized = trimmed;
+    for (const [idMonth, enMonth] of Object.entries(monthsMap)) {
+      normalized = normalized.replace(new RegExp(`\\b${idMonth}\\b`, 'i'), enMonth);
+    }
+    const idParsed = new Date(normalized);
+    if (!isNaN(idParsed.getTime())) return idParsed;
+  }
+  return fallbackDate || null;
 }
 
 export function enforceQuietHours(scheduledDate: Date, startStr: string = '20:00', endStr: string = '08:00'): Date {
@@ -97,8 +125,8 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
 
   const currentStatus = (payload.status || payload.event_type || 'ANY').toUpperCase();
 
-  // Special Auto-Cancel Case: If order status changes to RETURNED, cancel any pending OVERDUE reminders for this order
-  if (currentStatus === 'RETURNED' && payload.order_id) {
+  // Special Auto-Cancel Case: If order status changes to RETURNED or COMPLETED, cancel any pending reminders for this order
+  if ((currentStatus === 'RETURNED' || currentStatus === 'COMPLETED') && payload.order_id) {
     await prisma.scheduledNotification.updateMany({
       where: {
         tenantId,
@@ -109,7 +137,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
         status: 'CANCELLED'
       }
     });
-    console.log(`[ZioSewa Engine] Cancelled pending notifications for returned order ${payload.order_id}`);
+    console.log(`[ZioSewa Engine] Cancelled pending notifications for returned/completed order ${payload.order_id}`);
   }
 
   // Retrieve active automation rules for this tenant
@@ -128,13 +156,28 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
 
   for (const rule of rules) {
     let shouldTrigger = false;
+    const statusMatches = rule.targetStatus === 'ANY' || rule.targetStatus === currentStatus;
 
     if (rule.triggerType === 'EVENT_STATUS_CHANGED') {
-      if (rule.targetStatus === 'ANY' || rule.targetStatus === currentStatus) {
+      if (statusMatches) {
         shouldTrigger = true;
       }
-    } else if ((rule.triggerType === 'TIME_DUE_COUNTDOWN' || rule.triggerType === 'TIME_OVERDUE') && payload.due_datetime) {
-      shouldTrigger = true;
+    } else if (rule.triggerType === 'TIME_DUE_COUNTDOWN' || rule.triggerType === 'TIME_OVERDUE') {
+      if (statusMatches) {
+        let targetRawDate: any = null;
+        if (rule.baseDateKey && payload.data && payload.data[rule.baseDateKey]) {
+          targetRawDate = payload.data[rule.baseDateKey];
+        } else if (rule.baseDateKey && (payload as any)[rule.baseDateKey]) {
+          targetRawDate = (payload as any)[rule.baseDateKey];
+        } else {
+          targetRawDate = payload.due_datetime;
+        }
+
+        const resolvedBaseDate = parseBaseDate(targetRawDate, payload.due_datetime ? new Date(payload.due_datetime) : undefined);
+        if (resolvedBaseDate || rule.offsetDirection === 'IMMEDIATE') {
+          shouldTrigger = true;
+        }
+      }
     }
 
     if (!shouldTrigger) continue;
@@ -145,11 +188,31 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
       targetDevice = device;
     }
 
-    // Calculate scheduled time
+    // Extract base date for rule scheduling
+    let baseRawDate: any = null;
+    if (rule.baseDateKey && payload.data && payload.data[rule.baseDateKey]) {
+      baseRawDate = payload.data[rule.baseDateKey];
+    } else if (rule.baseDateKey && (payload as any)[rule.baseDateKey]) {
+      baseRawDate = (payload as any)[rule.baseDateKey];
+    } else {
+      baseRawDate = payload.due_datetime;
+    }
+
+    const baseDate = parseBaseDate(baseRawDate, payload.due_datetime ? new Date(payload.due_datetime) : new Date()) || new Date();
+
+    // Calculate scheduled time based on offsetDirection
     let scheduledTime = new Date();
 
-    if ((rule.triggerType === 'TIME_DUE_COUNTDOWN' || rule.triggerType === 'TIME_OVERDUE') && payload.due_datetime) {
-      const baseDate = new Date(payload.due_datetime);
+    if (rule.offsetDirection === 'IMMEDIATE') {
+      scheduledTime = new Date();
+    } else if (rule.offsetDirection === 'FIXED_TIME') {
+      scheduledTime = new Date(baseDate.getTime());
+      const fixedTimeStr = rule.fixedTime || '09:00';
+      const [hStr, mStr] = fixedTimeStr.split(':');
+      const hours = parseInt(hStr, 10) || 9;
+      const minutes = parseInt(mStr, 10) || 0;
+      scheduledTime.setHours(hours, minutes, 0, 0);
+    } else {
       let offsetMs = rule.offsetValue * 60 * 1000;
       if (rule.offsetUnit === 'HOURS') offsetMs = rule.offsetValue * 3600 * 1000;
       if (rule.offsetUnit === 'DAYS') offsetMs = rule.offsetValue * 86400 * 1000;

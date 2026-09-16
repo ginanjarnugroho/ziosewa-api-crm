@@ -136,7 +136,7 @@ export default async function messageController(fastify: FastifyInstance) {
       }, {
         attempts: 3,
         backoff: { type: 'exponential', delay: 2000 }
-      });
+      } as any);
 
       return reply.send({
         success: true,
