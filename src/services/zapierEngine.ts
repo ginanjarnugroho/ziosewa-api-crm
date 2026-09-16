@@ -29,7 +29,9 @@ export function compileTemplateText(templateText: string, data: Record<string, a
     '{nama_pelanggan}': data.nama_pelanggan || 'Pelanggan',
     '{nama_barang}': data.nama_barang || 'Barang Sewa',
     '{tgl_sewa}': data.tgl_sewa || '-',
-    '{jam_kembali}': data.jam_kembali || '-',
+    '{tgl_acara}': data.tgl_acara || '-',
+    '{tgl_ambil}': data.tgl_ambil || '-',
+    '{tgl_kembali}': data.tgl_kembali || '-',
     '{total_bayar}': data.total_bayar || '-',
     '{sisa_tagihan}': data.sisa_tagihan || '-',
     '{alamat_toko}': data.alamat_toko || '-'
