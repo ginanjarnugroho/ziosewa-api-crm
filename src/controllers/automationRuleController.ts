@@ -65,7 +65,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
         nama_pelanggan: 'Ginanjar Nugroho',
         nama_barang: 'Kamera Sony Alpha A7 III + Lensa 24-70mm',
         tgl_sewa: '10 Aug 2026',
-        jam_kembali: '12 Aug 2026 18:00',
+        tgl_kembali: '12 Aug 2026 18:00',
         total_bayar: 'Rp 450.000',
         sisa_tagihan: 'Rp 0',
         alamat_toko: 'SewaPro Store Lt. 1, Medan',

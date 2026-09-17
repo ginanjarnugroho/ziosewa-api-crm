@@ -13,7 +13,9 @@ export interface WebhookPayload {
     nama_pelanggan?: string;
     nama_barang?: string;
     tgl_sewa?: string;
-    jam_kembali?: string;
+    tgl_acara?: string;
+    tgl_ambil?: string;
+    tgl_kembali?: string;
     total_bayar?: string;
     sisa_tagihan?: string;
     alamat_toko?: string;
@@ -32,7 +34,6 @@ export function compileTemplateText(templateText: string, data: Record<string, a
     '{tgl_acara}': data.tgl_acara || '-',
     '{tgl_ambil}': data.tgl_ambil || '-',
     '{tgl_kembali}': data.tgl_kembali || '-',
-    '{jam_kembali}': data.jam_kembali || '-',
     '{total_bayar}': data.total_bayar || '-',
     '{sisa_tagihan}': data.sisa_tagihan || '-',
     '{alamat_toko}': data.alamat_toko || '-'

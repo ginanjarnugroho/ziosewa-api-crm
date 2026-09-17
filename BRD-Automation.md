@@ -74,7 +74,7 @@ Sistem wajib menyediakan halaman khusus bagi Pemilik UMKM untuk mengelola templa
 * **FR-03.1 (Dynamic Variable Chips):** Menyediakan tombol tag dinamis yang dapat diklik untuk memasukkan data transaksi secara otomatis:
   * `{nama_pelanggan}`
   * `{nama_barang}`
-  * `{tgl_sewa}` & `{jam_kembali}`
+  * `{tgl_sewa}` & `{tgl_kembali}`
   * `{total_bayar}` & `{sisa_tagihan}`
   * `{alamat_toko}`
 * **FR-03.2 (WYSIWYG / Formatting Support):** Mendukung format bawaan WhatsApp seperti Bold (`*teks*`), Italic (`_teks_`), Strikethrough (`~teks~`), dan pemilih Emoji.

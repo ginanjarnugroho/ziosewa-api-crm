@@ -136,7 +136,7 @@ export async function bootstrapDatabase() {
           const defaultTemplates = [
             {
               name: 'Nota Sewa Baru (Order Created)',
-              templateText: 'Halo *{nama_pelanggan}*, terima kasih telah menyewa di *{alamat_toko}*.\n\nBerikut nota pesanan Anda:\n📦 Barang: *{nama_barang}*\n📅 Batas Pengembalian: *{jam_kembali}*\n💰 Total Sewa: *{total_bayar}*\n💳 Sisa Tagihan: *{sisa_tagihan}*\n\nHarap menjaga barang sewa dengan baik. Terima kasih!',
+              templateText: 'Halo *{nama_pelanggan}*, terima kasih telah menyewa di *{alamat_toko}*.\n\nBerikut nota pesanan Anda:\n📦 Barang: *{nama_barang}*\n📅 Batas Pengembalian: *{tgl_kembali}*\n💰 Total Sewa: *{total_bayar}*\n💳 Sisa Tagihan: *{sisa_tagihan}*\n\nHarap menjaga barang sewa dengan baik. Terima kasih!',
               ruleName: 'Zap: Send Receipt on Order Created',
               triggerType: 'EVENT_STATUS_CHANGED' as any,
               targetStatus: 'ORDER_CREATED',
@@ -166,7 +166,7 @@ export async function bootstrapDatabase() {
             },
             {
               name: 'Pengingat H-2 Jam (Due Reminder)',
-              templateText: '⏰ *PENGINGAT PENGEMBALIAN BARANG*\n\nHalo *{nama_pelanggan}*, mengingatkan bahwa batas waktu pengembalian *{nama_barang}* adalah hari ini jam *{jam_kembali}* di *{alamat_toko}*.\n\nMohon mengembalikan tepat waktu untuk menghindari denda keterlambatan.',
+              templateText: '⏰ *PENGINGAT PENGEMBALIAN BARANG*\n\nHalo *{nama_pelanggan}*, mengingatkan bahwa batas waktu pengembalian *{nama_barang}* adalah *{tgl_kembali}* di *{alamat_toko}*.\n\nMohon mengembalikan tepat waktu untuk menghindari denda keterlambatan.',
               ruleName: 'Zap: Remind 2 Hours Before Due Time',
               triggerType: 'TIME_DUE_COUNTDOWN' as any,
               targetStatus: 'ANY',
@@ -176,7 +176,7 @@ export async function bootstrapDatabase() {
             },
             {
               name: 'Teguran Keterlambatan (Overdue Alert)',
-              templateText: '⚠️ *PERINGATAN KETERLAMBATAN PENGEMBALIAN*\n\nHalo *{nama_pelanggan}*, batas waktu pengembalian *{nama_barang}* (*{jam_kembali}*) telah terlewati.\n\nMohon segera mengembalikan barang ke *{alamat_toko}* atau menghubungi kasir toko kami. Terima kasih!',
+              templateText: '⚠️ *PERINGATAN KETERLAMBATAN PENGEMBALIAN*\n\nHalo *{nama_pelanggan}*, batas waktu pengembalian *{nama_barang}* (*{tgl_kembali}*) telah terlewati.\n\nMohon segera mengembalikan barang ke *{alamat_toko}* atau menghubungi kasir toko kami. Terima kasih!',
               ruleName: 'Zap: Alert 1 Hour After Overdue',
               triggerType: 'TIME_OVERDUE' as any,
               targetStatus: 'ANY',
