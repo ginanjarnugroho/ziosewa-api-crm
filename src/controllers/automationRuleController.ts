@@ -123,6 +123,26 @@ export default async function automationRuleController(fastify: FastifyInstance)
     }
   });
 
+  // GET automation rule by id
+  fastify.get('/api/v1/automation-rules/:id', async (request, reply) => {
+    try {
+      const { id } = request.params as any;
+
+      const automationRole = await prisma.automationRule.findFirst({
+          where: { id }
+        });
+
+      if (!automationRole) {
+        return reply.status(404).send({ success: false, error: 'Automation Rule not found' });
+      }
+
+      return { success: true, data: automationRole };
+    } catch (err: any) {
+      console.error('[GET automation-rule by id Error]', err);
+      return reply.status(500).send({ success: false, error: err.message });
+    }
+  });
+
   // CREATE automation rule
   fastify.post('/api/v1/automation-rules', async (request, reply) => {
     try {
