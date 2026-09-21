@@ -88,6 +88,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
           r.tenant_id as "tenantId",
           r.device_id as "deviceId",
           r.device_id as "device_id",
+          r.module_id as "moduleId",
+          r.module_id as "module_id",
           r.name,
           r.trigger_type as "triggerType",
           r.target_status as "targetStatus",
@@ -149,6 +151,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
       const {
         tenant_id,
         device_id,
+        module_id,
+        moduleId,
         name,
         trigger_type,
         target_status,
@@ -171,12 +175,14 @@ export default async function automationRuleController(fastify: FastifyInstance)
       const validDeviceId = (device_id && typeof device_id === 'string' && device_id.trim() !== '') ? device_id.trim() : null;
       const targetBaseDateKey = base_date_key !== undefined ? base_date_key : baseDateKey || null;
       const targetFixedTime = fixed_time !== undefined ? fixed_time : fixedTime || null;
+      const targetModuleId = module_id !== undefined ? module_id : moduleId || null;
 
       try {
         const rule = await prisma.automationRule.create({
           data: {
             tenantId: tenant.id,
             deviceId: validDeviceId,
+            moduleId: targetModuleId,
             name: name || 'Rule Baru',
             triggerType: trigger_type || 'EVENT_STATUS_CHANGED',
             targetStatus: target_status || 'ANY',
@@ -197,6 +203,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
         const rule = await prisma.automationRule.create({
           data: {
             tenantId: tenant.id,
+            moduleId: targetModuleId,
             name: name || 'Rule Baru',
             triggerType: trigger_type || 'EVENT_STATUS_CHANGED',
             targetStatus: target_status || 'ANY',
@@ -233,6 +240,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
       const { id } = request.params as any;
       const {
         device_id,
+        module_id,
+        moduleId,
         name,
         trigger_type,
         target_status,
@@ -261,6 +270,9 @@ export default async function automationRuleController(fastify: FastifyInstance)
       }
       if (fixed_time !== undefined || fixedTime !== undefined) {
         updateData.fixedTime = fixed_time !== undefined ? fixed_time : fixedTime;
+      }
+      if (module_id !== undefined || moduleId !== undefined) {
+        updateData.moduleId = module_id !== undefined ? module_id : moduleId;
       }
       if (quiet_hours_start !== undefined) updateData.quietHoursStart = quiet_hours_start;
       if (quiet_hours_end !== undefined) updateData.quietHoursEnd = quiet_hours_end;

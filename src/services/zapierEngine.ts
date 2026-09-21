@@ -239,6 +239,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
 
     // Check if immediate execution (scheduled within 10 seconds of now)
     const isImmediate = Math.abs(scheduledTime.getTime() - Date.now()) < 10000;
+    const resolvedModuleId = rule.moduleId || null;
 
     if (isImmediate && targetDevice && targetDevice.status === 'connected') {
       // Execute immediately via WahaAdapter
@@ -254,6 +255,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
             tenantId,
             deviceId: targetDevice.id,
             ruleId: rule.id,
+            moduleId: resolvedModuleId,
             orderId: payload.order_id || null,
             recipient: recipientJid,
             eventKey: currentStatus,
@@ -272,6 +274,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
             tenantId,
             deviceId: targetDevice?.id || null,
             ruleId: rule.id,
+            moduleId: resolvedModuleId,
             orderId: payload.order_id || null,
             recipient: recipientJid,
             eventKey: currentStatus,
@@ -291,6 +294,7 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
           tenantId,
           deviceId: targetDevice?.id || null,
           ruleId: rule.id,
+          moduleId: resolvedModuleId,
           orderId: payload.order_id || null,
           recipient: recipientJid,
           eventKey: currentStatus,

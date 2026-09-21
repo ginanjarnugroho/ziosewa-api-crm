@@ -87,6 +87,7 @@ export async function bootstrapDatabase() {
             "quiet_hours_end" VARCHAR DEFAULT '08:00',
             "template_id" UUID NOT NULL,
             "is_enabled" BOOLEAN NOT NULL DEFAULT true,
+            "module_id" VARCHAR,
             "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
             "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT "automation_rules_pkey" PRIMARY KEY ("id"),
@@ -100,6 +101,7 @@ export async function bootstrapDatabase() {
             "tenant_id" UUID NOT NULL,
             "device_id" UUID,
             "rule_id" UUID,
+            "module_id" VARCHAR,
             "order_id" VARCHAR,
             "recipient" VARCHAR NOT NULL,
             "event_key" VARCHAR NOT NULL,
@@ -121,6 +123,8 @@ export async function bootstrapDatabase() {
       await prisma.$executeRawUnsafe(`ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "device_id" UUID;`);
       await prisma.$executeRawUnsafe(`ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "base_date_key" VARCHAR;`);
       await prisma.$executeRawUnsafe(`ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "fixed_time" VARCHAR;`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "automation_rules" ADD COLUMN IF NOT EXISTS "module_id" VARCHAR;`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE "scheduled_notifications" ADD COLUMN IF NOT EXISTS "module_id" VARCHAR;`);
 
       console.log('[Auto-Fix] Successfully verified / created automation database tables.');
     } catch (e) {

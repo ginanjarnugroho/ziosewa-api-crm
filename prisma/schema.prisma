@@ -191,6 +191,7 @@ model AutomationRule {
   id              String          @id @default(uuid()) @db.Uuid
   tenantId        String          @map("tenant_id") @db.Uuid
   deviceId        String?         @map("device_id") @db.Uuid
+  moduleId        String?         @map("module_id") @db.VarChar
   name            String          @db.VarChar
   triggerType     TriggerType     @map("trigger_type")
   targetStatus    String          @default("ANY") @map("target_status") @db.VarChar
@@ -218,6 +219,7 @@ model ScheduledNotification {
   tenantId     String             @map("tenant_id") @db.Uuid
   deviceId     String?            @map("device_id") @db.Uuid
   ruleId       String?            @map("rule_id") @db.Uuid
+  moduleId     String?            @map("module_id") @db.VarChar
   orderId      String?            @map("order_id") @db.VarChar
   recipient    String             @db.VarChar
   eventKey     String             @map("event_key") @db.VarChar
