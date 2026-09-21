@@ -188,28 +188,29 @@ model MessageTemplate {
 }
 
 model AutomationRule {
-  id              String          @id @default(uuid()) @db.Uuid
-  tenantId        String          @map("tenant_id") @db.Uuid
-  deviceId        String?         @map("device_id") @db.Uuid
-  moduleId        String?         @map("module_id") @db.VarChar
-  name            String          @db.VarChar
-  triggerType     TriggerType     @map("trigger_type")
-  targetStatus    String          @default("ANY") @map("target_status") @db.VarChar
-  offsetValue     Int             @default(0) @map("offset_value")
-  offsetUnit      OffsetUnit      @default(HOURS) @map("offset_unit")
-  offsetDirection OffsetDirection @default(IMMEDIATE) @map("offset_direction")
-  baseDateKey     String?         @map("base_date_key") @db.VarChar
-  fixedTime       String?         @map("fixed_time") @db.VarChar
-  quietHoursStart String?         @default("20:00") @map("quiet_hours_start") @db.VarChar
-  quietHoursEnd   String?         @default("08:00") @map("quiet_hours_end") @db.VarChar
-  templateId      String          @map("template_id") @db.Uuid
-  isEnabled       Boolean         @default(true) @map("is_enabled")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @map("tenant_id") @db.Uuid
+  deviceId        String?          @map("device_id") @db.Uuid
+  moduleId        String?          @map("module_id") @db.VarChar
+  name            String           @db.VarChar
+  triggerType     TriggerType      @map("trigger_type")
+  targetStatus    String           @default("ANY") @map("target_status") @db.VarChar
+  offsetValue     Int              @default(0) @map("offset_value")
+  offsetUnit      OffsetUnit       @default(HOURS) @map("offset_unit")
+  offsetDirection OffsetDirection  @default(IMMEDIATE) @map("offset_direction")
+  baseDateKey     String?          @map("base_date_key") @db.VarChar
+  fixedTime       String?          @map("fixed_time") @db.VarChar
+  quietHoursStart String?          @default("20:00") @map("quiet_hours_start") @db.VarChar
+  quietHoursEnd   String?          @default("08:00") @map("quiet_hours_end") @db.VarChar
+  templateId      String?          @map("template_id") @db.Uuid
+  templateText    String?          @map("template_text") @db.Text
+  isEnabled       Boolean          @default(true) @map("is_enabled")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  device   Device?         @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  template MessageTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  device   Device?          @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  template MessageTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("automation_rules")
 }

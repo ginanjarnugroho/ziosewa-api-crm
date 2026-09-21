@@ -235,7 +235,8 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
     );
 
     // Compile template text
-    const renderedText = compileTemplateText(rule.template.templateText, payload.data || {});
+    const rawTemplateText = rule.templateText || rule.template?.templateText || '';
+    const renderedText = compileTemplateText(rawTemplateText, payload.data || {});
 
     // Check if immediate execution (scheduled within 10 seconds of now)
     const isImmediate = Math.abs(scheduledTime.getTime() - Date.now()) < 10000;

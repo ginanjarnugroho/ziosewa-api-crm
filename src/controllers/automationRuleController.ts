@@ -103,6 +103,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
           r.quiet_hours_start as "quietHoursStart",
           r.quiet_hours_end as "quietHoursEnd",
           r.template_id as "templateId",
+          r.template_text as "templateText",
+          r.template_text as "template_text",
           r.is_enabled as "isEnabled",
           r.created_at as "createdAt",
           r.updated_at as "updatedAt",
@@ -166,6 +168,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
         quiet_hours_start,
         quiet_hours_end,
         template_id,
+        template_text,
+        templateText,
         is_enabled
       } = request.body as any;
 
@@ -176,6 +180,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
       const targetBaseDateKey = base_date_key !== undefined ? base_date_key : baseDateKey || null;
       const targetFixedTime = fixed_time !== undefined ? fixed_time : fixedTime || null;
       const targetModuleId = module_id !== undefined ? module_id : moduleId || null;
+      const targetTemplateText = template_text !== undefined ? template_text : templateText || null;
 
       try {
         const rule = await prisma.automationRule.create({
@@ -193,7 +198,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
             fixedTime: targetFixedTime,
             quietHoursStart: quiet_hours_start || '20:00',
             quietHoursEnd: quiet_hours_end || '08:00',
-            templateId: template_id,
+            templateId: template_id || undefined,
+            templateText: targetTemplateText,
             isEnabled: is_enabled !== undefined ? is_enabled : true
           },
           include: { template: true }
@@ -214,7 +220,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
             fixedTime: targetFixedTime,
             quietHoursStart: quiet_hours_start || '20:00',
             quietHoursEnd: quiet_hours_end || '08:00',
-            templateId: template_id,
+            templateId: template_id || undefined,
+            templateText: targetTemplateText,
             isEnabled: is_enabled !== undefined ? is_enabled : true
           },
           include: { template: true }
@@ -255,6 +262,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
         quiet_hours_start,
         quiet_hours_end,
         template_id,
+        template_text,
+        templateText,
         is_enabled
       } = request.body as any;
 
@@ -273,6 +282,9 @@ export default async function automationRuleController(fastify: FastifyInstance)
       }
       if (module_id !== undefined || moduleId !== undefined) {
         updateData.moduleId = module_id !== undefined ? module_id : moduleId;
+      }
+      if (template_text !== undefined || templateText !== undefined) {
+        updateData.templateText = template_text !== undefined ? template_text : templateText;
       }
       if (quiet_hours_start !== undefined) updateData.quietHoursStart = quiet_hours_start;
       if (quiet_hours_end !== undefined) updateData.quietHoursEnd = quiet_hours_end;
