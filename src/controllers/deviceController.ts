@@ -12,40 +12,25 @@ export default async function deviceController(fastify: FastifyInstance) {
       tags: ['Device'],
       body: {
         type: 'object',
-        required: ['device_id', 'channel_type'],
+        required: ['device_id'],
         properties: {
-          device_id: { type: 'string', description: 'Unique identifier for the device (e.g., store_01)' },
-          channel_type: { type: 'string', enum: ['wa_unofficial', 'wa_cloud', 'telegram'] },
-          connection_method: { type: 'string' },
-          phone_number: { type: 'string' },
-          tenant_id: { type: 'string', description: 'Required for new devices' }
+          device_id: { type: 'string', description: 'Unique identifier for the device (e.g., store_01)' }
         }
       }
     }
   }, async (request, reply) => {
-    // 1. Ambil spesifikasi perangkat dari Request Body
-    const { device_id, channel_type, connection_method, phone_number, tenant_id } = request.body as any;
+    const { device_id } = request.body as any;
 
-    // 2. Cek apakah perangkat sudah pernah terdaftar di Database
-    let device = await findDeviceByIdentifier(device_id);
+    // 2. Cek apakah perangkat sudah terdaftar di Database
+    const device = await findDeviceByIdentifier(device_id);
 
     if (!device) {
-      if (!tenant_id) {
-        return reply.status(400).send({ error: "tenant_id is required for new devices" });
-      }
-      
-      // 3. Jika belum terdaftar, buat perangkat baru dengan status 'pairing'
-      device = await createDevice({
-        tenantId: tenant_id,
-        deviceIdentifier: device_id,
-        channelType: channel_type,
-        status: 'pairing',
-      });
+      return reply.status(400).send({ success: false, error: 'Device not found' });
     }
 
     try {
       // 4. Inisiasi Adapter (contoh: waha, baileys, telegram)
-      const adapter = AdapterFactory.getAdapter(channel_type);
+      const adapter = AdapterFactory.getAdapter(device.channelType);
       
       // 5. Panggil fungsi koneksi secara asinkron (Asynchronous Connect)
       //    Sistem akan mencoba menghasilkan QR code melalui Webhooks / Event Listener 
@@ -150,17 +135,12 @@ export default async function deviceController(fastify: FastifyInstance) {
     security: [{ bearerAuth: [] }],
     body: {
       type: 'object',
-      required: ['device_id', 'channel_type'],
+      required: ['device_identifier_name', 'channel_type'],
       properties: {
-        device_id: { type: 'string', description: 'Unique identifier for the device (e.g., store_01)' },
-        device_identifier: { type: 'string', description: 'Alternative alias for device_id' },
+        device_identifier_name: { type: 'string', description: 'Name/label of the device' },
         channel_type: { type: 'string', enum: ['wa_unofficial', 'wa_cloud', 'telegram', 'line'], description: 'Channel type' },
-        status: { type: 'string', enum: ['pairing', 'connected', 'disconnected', 'banned'], default: 'pairing' },
-        provider_config: { type: 'object', description: 'Optional provider configuration' },
-        tenant_id: { type: 'string', description: 'Tenant ID (required if not authenticated via Bearer token)' },
-        auto_connect: { type: 'boolean', description: 'If true, initiates connection to adapter immediately', default: false },
-        remote_jid: { type: 'string', description: 'WhatsApp / Channel Remote JID (e.g., 628123456789@s.whatsapp.net)' },
-        push_name: { type: 'string', description: 'Display name / push name of the device owner' }
+        tenant_id: { type: 'string', description: 'Tenant ID (optional if authenticated via Bearer token)' },
+        auto_connect: { type: 'boolean', description: 'If true, initiates connection to adapter immediately', default: false }
       }
     }
   };
@@ -168,12 +148,8 @@ export default async function deviceController(fastify: FastifyInstance) {
   const handleCreateDevice = async (request: any, reply: any) => {
     try {
       const body = request.body || {};
-      const deviceId = body.device_id || body.device_identifier || body.deviceIdentifier;
-      const channelType = body.channel_type || body.channelType;
-      const status = body.status || 'pairing';
-      const providerConfig = body.provider_config || body.providerConfig;
-      const remoteJid = body.remote_jid || body.remoteJid;
-      const pushName = body.push_name || body.pushName;
+      const deviceIdentifierName = body.device_identifier_name;
+      const channelType = body.channel_type;
       const tenant = request.tenant || (body.tenant_id ? { id: body.tenant_id } : await findFirstTenant());
 
       const tenantId = tenant?.id;
@@ -181,13 +157,16 @@ export default async function deviceController(fastify: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'tenant_id is required' });
       }
 
-      if (!deviceId) {
-        return reply.status(400).send({ success: false, error: 'device_id is required' });
+      if (!deviceIdentifierName) {
+        return reply.status(400).send({ success: false, error: 'device_identifier_name is required' });
       }
 
       if (!channelType) {
         return reply.status(400).send({ success: false, error: 'channel_type is required' });
       }
+
+      // Generate device_id: tenant_id + "_" + device_identifier_name
+      const deviceId = `${tenantId}_${deviceIdentifierName}`;
 
       // Check if device already exists for this tenant
       const existing = await findDeviceByIdentifier(deviceId, tenantId);
@@ -202,11 +181,9 @@ export default async function deviceController(fastify: FastifyInstance) {
       const device = await createDevice({
         tenantId,
         deviceIdentifier: deviceId,
+        deviceIdentifierName,
         channelType,
-        status,
-        providerConfig,
-        remoteJid,
-        pushName
+        status: 'pairing'
       });
 
       if (body.auto_connect) {

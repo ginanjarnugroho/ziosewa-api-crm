@@ -50,8 +50,9 @@ enum DeviceStatus {
 model Device {
   id               String       @id @default(uuid()) @db.Uuid
   tenantId         String       @map("tenant_id") @db.Uuid
-  deviceIdentifier String       @map("device_identifier") @db.VarChar
-  channelType      ChannelType  @map("channel_type")
+  deviceIdentifier     String       @map("device_identifier") @db.VarChar
+  deviceIdentifierName String?      @map("device_identifier_name") @db.VarChar
+  channelType          ChannelType  @map("channel_type")
   status           DeviceStatus @default(pairing)
   providerConfig   Json?        @map("provider_config") @db.JsonB
   remoteJid        String?      @map("remote_jid") @db.VarChar

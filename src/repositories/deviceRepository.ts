@@ -60,6 +60,7 @@ export async function findDeviceByIdentifier(deviceIdentifier: string, tenantId?
 export async function createDevice(data: {
   tenantId: string;
   deviceIdentifier: string;
+  deviceIdentifierName?: string;
   channelType: string;
   status?: string;
   providerConfig?: any;
@@ -70,6 +71,7 @@ export async function createDevice(data: {
     data: {
       tenantId: data.tenantId,
       deviceIdentifier: data.deviceIdentifier,
+      ...(data.deviceIdentifierName !== undefined ? { deviceIdentifierName: data.deviceIdentifierName } : {}),
       channelType: data.channelType as any,
       status: (data.status as any) || 'pairing',
       ...(data.providerConfig !== undefined ? { providerConfig: data.providerConfig } : {}),
