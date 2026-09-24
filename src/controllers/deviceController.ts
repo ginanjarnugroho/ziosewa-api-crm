@@ -135,9 +135,9 @@ export default async function deviceController(fastify: FastifyInstance) {
     security: [{ bearerAuth: [] }],
     body: {
       type: 'object',
-      required: ['device_identifier_name', 'channel_type'],
+      required: ['device_id', 'channel_type'],
       properties: {
-        device_identifier_name: { type: 'string', description: 'Name/label of the device' },
+        device_id: { type: 'string', description: 'Unique identifier for the device (e.g., store_01)' },
         channel_type: { type: 'string', enum: ['wa_unofficial', 'wa_cloud', 'telegram', 'line'], description: 'Channel type' },
         tenant_id: { type: 'string', description: 'Tenant ID (optional if authenticated via Bearer token)' },
         auto_connect: { type: 'boolean', description: 'If true, initiates connection to adapter immediately', default: false }
@@ -148,7 +148,7 @@ export default async function deviceController(fastify: FastifyInstance) {
   const handleCreateDevice = async (request: any, reply: any) => {
     try {
       const body = request.body || {};
-      const deviceIdentifierName = body.device_identifier_name;
+      const deviceId = body.device_id;
       const channelType = body.channel_type;
       const tenant = request.tenant || (body.tenant_id ? { id: body.tenant_id } : await findFirstTenant());
 
@@ -157,16 +157,13 @@ export default async function deviceController(fastify: FastifyInstance) {
         return reply.status(400).send({ success: false, error: 'tenant_id is required' });
       }
 
-      if (!deviceIdentifierName) {
-        return reply.status(400).send({ success: false, error: 'device_identifier_name is required' });
+      if (!deviceId) {
+        return reply.status(400).send({ success: false, error: 'device_id is required' });
       }
 
       if (!channelType) {
         return reply.status(400).send({ success: false, error: 'channel_type is required' });
       }
-
-      // Generate device_id: tenant_id + "_" + device_identifier_name
-      const deviceId = `${tenantId}_${deviceIdentifierName}`;
 
       // Check if device already exists for this tenant
       const existing = await findDeviceByIdentifier(deviceId, tenantId);
@@ -178,12 +175,13 @@ export default async function deviceController(fastify: FastifyInstance) {
         });
       }
 
+      const status = body.auto_connect ? 'pairing' : 'disconnected';
+
       const device = await createDevice({
         tenantId,
         deviceIdentifier: deviceId,
-        deviceIdentifierName,
         channelType,
-        status: 'pairing'
+        status
       });
 
       if (body.auto_connect) {
