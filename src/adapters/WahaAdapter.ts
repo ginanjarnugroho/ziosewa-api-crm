@@ -103,7 +103,7 @@ export class WahaAdapter implements MessagingChannelAdapter {
 
         // If STOPPED or FAILED, we just need to start the existing session!
         try {
-          await axios.post(`${WAHA_URL}/api/sessions/${deviceId}/start`, {}, { headers: this.getHeaders() });
+          var res = await axios.post(`${WAHA_URL}/api/sessions/${deviceId}/restart`, {}, { headers: this.getHeaders() });
         } catch(e: any) {
           let errData = e.response?.data || e.message;
           if (typeof errData === 'string' && errData.toLowerCase().includes('<html')) {
