@@ -34,7 +34,6 @@ export default async function webhookCatchController(fastify: FastifyInstance) {
           const res = await processIncomingWebhook(item);
           results.push({
             order_id: item.order_id || null,
-            module_id: item.module_id || item.moduleId || null,
             customer_phone: item.customer_phone,
             event_type: item.event_type || item.status || null,
             result: res
@@ -43,7 +42,6 @@ export default async function webhookCatchController(fastify: FastifyInstance) {
           console.error(`[ZioSewa Webhook Batch Item Error] customer_phone=${item.customer_phone}:`, itemErr.message);
           results.push({
             order_id: item.order_id || null,
-            module_id: item.module_id || item.moduleId || null,
             customer_phone: item.customer_phone,
             error: itemErr.message
           });
