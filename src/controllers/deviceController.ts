@@ -1,7 +1,6 @@
 import { CloudTasksService } from '../services/CloudTasksService';
 import { FastifyInstance } from 'fastify';
-import fs from 'fs';
-import path from 'path';
+
 import { createDevice, findDeviceByIdentifier, findDevicesByTenant, updateDeviceStatus } from '../repositories/deviceRepository';
 import { findFirstTenant } from '../repositories/tenantRepository';
 import { AdapterFactory } from '../services/AdapterFactory';
@@ -145,8 +144,101 @@ export default async function deviceController(fastify: FastifyInstance) {
     return reply.send({ status: 'success', message: 'Device disconnected and session cleared' });
   });
 
+  const createDeviceSchema = {
+    description: 'Create and register a new device',
+    tags: ['Devices', 'Device'],
+    security: [{ bearerAuth: [] }],
+    body: {
+      type: 'object',
+      required: ['device_id', 'channel_type'],
+      properties: {
+        device_id: { type: 'string', description: 'Unique identifier for the device (e.g., store_01)' },
+        device_identifier: { type: 'string', description: 'Alternative alias for device_id' },
+        channel_type: { type: 'string', enum: ['wa_unofficial', 'wa_cloud', 'telegram', 'line'], description: 'Channel type' },
+        status: { type: 'string', enum: ['pairing', 'connected', 'disconnected', 'banned'], default: 'pairing' },
+        provider_config: { type: 'object', description: 'Optional provider configuration' },
+        tenant_id: { type: 'string', description: 'Tenant ID (required if not authenticated via Bearer token)' },
+        auto_connect: { type: 'boolean', description: 'If true, initiates connection to adapter immediately', default: false },
+        remote_jid: { type: 'string', description: 'WhatsApp / Channel Remote JID (e.g., 628123456789@s.whatsapp.net)' },
+        push_name: { type: 'string', description: 'Display name / push name of the device owner' }
+      }
+    }
+  };
+
+  const handleCreateDevice = async (request: any, reply: any) => {
+    try {
+      const body = request.body || {};
+      const deviceId = body.device_id || body.device_identifier || body.deviceIdentifier;
+      const channelType = body.channel_type || body.channelType;
+      const status = body.status || 'pairing';
+      const providerConfig = body.provider_config || body.providerConfig;
+      const remoteJid = body.remote_jid || body.remoteJid;
+      const pushName = body.push_name || body.pushName;
+      const tenant = request.tenant || (body.tenant_id ? { id: body.tenant_id } : await findFirstTenant());
+
+      const tenantId = tenant?.id;
+      if (!tenantId) {
+        return reply.status(400).send({ success: false, error: 'tenant_id is required' });
+      }
+
+      if (!deviceId) {
+        return reply.status(400).send({ success: false, error: 'device_id is required' });
+      }
+
+      if (!channelType) {
+        return reply.status(400).send({ success: false, error: 'channel_type is required' });
+      }
+
+      // Check if device already exists for this tenant
+      const existing = await findDeviceByIdentifier(deviceId, tenantId);
+      if (existing) {
+        return reply.status(409).send({
+          success: false,
+          error: `Device with identifier '${deviceId}' already exists for this tenant`,
+          data: existing
+        });
+      }
+
+      const device = await createDevice({
+        tenantId,
+        deviceIdentifier: deviceId,
+        channelType,
+        status,
+        providerConfig,
+        remoteJid,
+        pushName
+      });
+
+      if (body.auto_connect) {
+        try {
+          const adapter = AdapterFactory.getAdapter(channelType);
+          adapter.connect(device.id, device.deviceIdentifier);
+        } catch (err: any) {
+          request.log.warn({ err }, `Failed to auto-connect device ${device.id}`);
+        }
+      }
+
+      return reply.status(201).send({
+        success: true,
+        message: 'Device created successfully',
+        data: device
+      });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: err.message });
+    }
+  };
+
+  // POST create device
+  fastify.post('/api/v1/devices', { schema: createDeviceSchema }, handleCreateDevice);
+
   // GET all devices for tenant
-  fastify.get('/api/v1/devices', async (request, reply) => {
+  fastify.get('/api/v1/devices', {
+    schema: {
+      description: 'Get all devices for tenant',
+      tags: ['Devices', 'Device'],
+      security: [{ bearerAuth: [] }]
+    }
+  }, async (request, reply) => {
     try {
       const tenant = (request as any).tenant || await findFirstTenant();
       const devices = await findDevicesByTenant(tenant?.id);

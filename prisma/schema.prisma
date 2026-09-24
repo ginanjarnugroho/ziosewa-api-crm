@@ -54,6 +54,8 @@ model Device {
   channelType      ChannelType  @map("channel_type")
   status           DeviceStatus @default(pairing)
   providerConfig   Json?        @map("provider_config") @db.JsonB
+  remoteJid        String?      @map("remote_jid") @db.VarChar
+  pushName         String?      @map("push_name") @db.VarChar
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
   tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)

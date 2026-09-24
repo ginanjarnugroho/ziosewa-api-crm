@@ -1,4 +1,4 @@
-import { updateDeviceStatus } from '../../repositories/deviceRepository';
+import { updateDeviceStatus, updateDeviceStatusAndContact } from '../../repositories/deviceRepository';
 import { io } from '../../server';
 import axios from 'axios';
 import { config } from '../../config/env';
@@ -17,11 +17,20 @@ export async function handleSessionStatus(payload: any, device: any, deviceId: s
 
   if (status === 'WORKING') {
      // WhatsApp terhubung.
-     // Perbarui status device di database menjadi 'connected'
-     await updateDeviceStatus(deviceId, 'connected', 'CONNECTED');
+     const me = payload.me || payload.payload?.me;
+     const remoteJid = me?.id;
+     const pushName = me?.pushName || me?.name;
+
+     // Perbarui status device di database menjadi 'connected' beserta info akun menggunakan updateDeviceStatusAndContact
+     await updateDeviceStatusAndContact(deviceId, 'connected', 'CONNECTED', remoteJid, pushName);
      
      // Beritahu frontend via WebSockets agar UI berubah (menghilangkan tampilan QR Code)
-     io.to(`tenant_${device.tenantId}`).emit('connection_update', { device_id: deviceId, status: 'connected' });
+     io.to(`tenant_${device.tenantId}`).emit('connection_update', { 
+       device_id: deviceId, 
+       status: 'connected',
+       remote_jid: remoteJid,
+       push_name: pushName
+     });
 
      // Simpan log status ke Google Cloud Storage (GCS) untuk keperluan pelacakan masalah/log
      uploadJson(
