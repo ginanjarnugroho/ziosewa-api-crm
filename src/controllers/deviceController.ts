@@ -22,10 +22,15 @@ export default async function deviceController(fastify: FastifyInstance) {
     const { device_id } = request.body as any;
 
     // 2. Cek apakah perangkat sudah terdaftar di Database
-    const device = await findDeviceByIdentifier(device_id);
+    let device = await findDeviceByIdentifier(device_id);
 
     if (!device) {
       return reply.status(400).send({ success: false, error: 'Device not found' });
+    }
+
+    // 3. Update status perangkat menjadi 'pairing' jika statusnya 'disconnected'
+    if (device.status === 'disconnected') {
+      device = await updateDeviceStatus(device.id, 'pairing', 'PAIRING');
     }
 
     try {
