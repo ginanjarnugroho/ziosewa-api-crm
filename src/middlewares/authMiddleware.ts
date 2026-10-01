@@ -28,7 +28,7 @@ export const authMiddleware = async (request: FastifyRequest, reply: FastifyRepl
     const body = request.body as any;
     const requestedTenantId = query?.tenant_id || body?.tenant_id || query?.tenantId || body?.tenantId;
 
-    if (requestedTenantId && requestedTenantId !== tenant.id) {
+    if (requestedTenantId && requestedTenantId !== tenant.apiKey) {
       return reply.status(403).send({ success: false, error: 'Access denied: You cannot access resources for another tenant_id' });
     }
 
