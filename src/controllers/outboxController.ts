@@ -7,10 +7,15 @@ export default async function outboxController(fastify: FastifyInstance) {
   // GET Outbox Notifications
   fastify.get('/api/v1/outbox', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+
       const { status, page = 1, limit = 20 } = request.query as any;
       const skip = (Number(page) - 1) * Number(limit);
 
       const whereClause: any = {};
+      whereClause.tenantId = tenantId;
+
       if (status && status !== 'ALL') {
         whereClause.status = status;
       }
@@ -43,19 +48,22 @@ export default async function outboxController(fastify: FastifyInstance) {
   // MANUAL RESEND Action
   fastify.post('/api/v1/outbox/:id/resend', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+
       const { id } = request.params as any;
 
-      const notif = await prisma.scheduledNotification.findUnique({
-        where: { id }
+      const notif = await prisma.scheduledNotification.findFirst({
+        where: { id, tenantId }
       });
 
       if (!notif) {
         return reply.status(404).send({ success: false, error: 'Data riwayat antrean tidak ditemukan' });
       }
 
-      // Find active connected device
+      // Find active connected device for this tenant
       const device = await prisma.device.findFirst({
-        where: { status: 'connected' },
+        where: { tenantId, status: 'connected' },
         orderBy: { updatedAt: 'desc' }
       });
 

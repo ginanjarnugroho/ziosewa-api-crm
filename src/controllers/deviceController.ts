@@ -2,7 +2,6 @@ import { CloudTasksService } from '../services/CloudTasksService';
 import { FastifyInstance } from 'fastify';
 
 import { createDevice, findDeviceByIdentifier, findDevicesByTenant, updateDeviceStatus } from '../repositories/deviceRepository';
-import { findFirstTenant } from '../repositories/tenantRepository';
 import { AdapterFactory } from '../services/AdapterFactory';
 
 export default async function deviceController(fastify: FastifyInstance) {
@@ -19,10 +18,12 @@ export default async function deviceController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
+    const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
     const { device_id } = request.body as any;
 
-    // 2. Cek apakah perangkat sudah terdaftar di Database
-    let device = await findDeviceByIdentifier(device_id);
+    // 2. Cek apakah perangkat sudah terdaftar di Database untuk Tenant ini
+    let device = await findDeviceByIdentifier(device_id, tenantId);
 
     if (!device) {
       return reply.status(400).send({ success: false, error: 'Device not found' });
@@ -75,16 +76,16 @@ export default async function deviceController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
+    const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
     const { device_id } = request.body as any;
-    const user = (request as any).user;
 
     try {
-      // 1. Verifikasi Kepemilikan Perangkat
-      const device = await findDeviceByIdentifier(device_id, user?.tenantId);
+      // 1. Verifikasi Kepemilikan Perangkat untuk Tenant ini
+      const device = await findDeviceByIdentifier(device_id, tenantId);
       if (!device) return reply.status(404).send({ success: false, error: 'Device not found' });
 
       // 2. Serahkan tugas sinkronisasi histori obrolan ke Background Worker (BullMQ)
-      //    Karena sinkronisasi membutuhkan waktu lama dan rakus sumber daya (Resource Intensive)
       await CloudTasksService.enqueueTask('/api/v1/internal/tasks/sync-history', {
         deviceId: device.id,
         tenantId: device.tenantId,
@@ -111,10 +112,12 @@ export default async function deviceController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
+    const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
     const { device_id, channel_type } = request.body as any;
 
-    // 1. Verifikasi Eksistensi Perangkat
-    const device = await findDeviceByIdentifier(device_id);
+    // 1. Verifikasi Eksistensi Perangkat untuk Tenant ini
+    const device = await findDeviceByIdentifier(device_id, tenantId);
     if (!device) return reply.status(404).send({ error: "Device not found" });
 
     // 2. Putus Sesi di Database: Ubah status menjadi 'disconnected' 
@@ -155,11 +158,10 @@ export default async function deviceController(fastify: FastifyInstance) {
       const body = request.body || {};
       const deviceId = body.device_id;
       const channelType = body.channel_type;
-      const tenant = request.tenant || (body.tenant_id ? { id: body.tenant_id } : await findFirstTenant());
+      const tenantId = request.tenant?.id || body.tenant_id;
 
-      const tenantId = tenant?.id;
       if (!tenantId) {
-        return reply.status(400).send({ success: false, error: 'tenant_id is required' });
+        return reply.status(401).send({ success: false, error: 'Unauthorized: tenant_id or Bearer token is required' });
       }
 
       if (!deviceId) {
@@ -220,8 +222,9 @@ export default async function deviceController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const tenant = (request as any).tenant || await findFirstTenant();
-      const devices = await findDevicesByTenant(tenant?.id);
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+      const devices = await findDevicesByTenant(tenantId);
       return { success: true, data: devices };
     } catch (err: any) {
       return reply.status(500).send({ success: false, error: err.message });

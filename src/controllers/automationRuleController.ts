@@ -6,7 +6,10 @@ export default async function automationRuleController(fastify: FastifyInstance)
   // GET all templates
   fastify.get('/api/v1/message-templates', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const templates = await prisma.messageTemplate.findMany({
+        where: { tenantId },
         orderBy: { createdAt: 'desc' }
       });
       return { success: true, data: templates };
@@ -19,13 +22,13 @@ export default async function automationRuleController(fastify: FastifyInstance)
   // CREATE message template
   fastify.post('/api/v1/message-templates', async (request, reply) => {
     try {
-      const { tenant_id, name, template_text } = request.body as any;
-      const tenant = tenant_id ? { id: tenant_id } : await prisma.tenant.findFirst();
-      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+      const { name, template_text } = request.body as any;
 
       const template = await prisma.messageTemplate.create({
         data: {
-          tenantId: tenant.id,
+          tenantId,
           name: name || 'Template Baru',
           templateText: template_text || ''
         }
@@ -40,8 +43,17 @@ export default async function automationRuleController(fastify: FastifyInstance)
   // UPDATE message template
   fastify.put('/api/v1/message-templates/:id', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { id } = request.params as any;
       const { name, template_text } = request.body as any;
+
+      const existing = await prisma.messageTemplate.findFirst({
+        where: { id, tenantId }
+      });
+      if (!existing) {
+        return reply.status(404).send({ success: false, error: 'Message template not found' });
+      }
 
       const template = await prisma.messageTemplate.update({
         where: { id },
@@ -82,6 +94,9 @@ export default async function automationRuleController(fastify: FastifyInstance)
   // GET all automation rules (raw SQL query to guarantee device_id & device object)
   fastify.get('/api/v1/automation-rules', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+
       const rawRules: any[] = await prisma.$queryRawUnsafe(`
         SELECT 
           r.id,
@@ -113,13 +128,17 @@ export default async function automationRuleController(fastify: FastifyInstance)
         FROM automation_rules r
         LEFT JOIN message_templates t ON r.template_id = t.id
         LEFT JOIN devices d ON r.device_id = d.id
+        WHERE r.tenant_id = '${tenantId}'::uuid
         ORDER BY r.created_at DESC
       `);
       return { success: true, data: rawRules };
     } catch (err: any) {
       console.error('[GET automation-rules Raw Error]', err.message);
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       // Fallback query if raw SQL fails
       const rules = await prisma.automationRule.findMany({
+        where: { tenantId },
         include: { template: true },
         orderBy: { createdAt: 'desc' }
       });
@@ -130,11 +149,13 @@ export default async function automationRuleController(fastify: FastifyInstance)
   // GET automation rule by id
   fastify.get('/api/v1/automation-rules/:id', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { id } = request.params as any;
 
       const automationRole = await prisma.automationRule.findFirst({
-          where: { id }
-        });
+        where: { id, tenantId }
+      });
 
       if (!automationRole) {
         return reply.status(404).send({ success: false, error: 'Automation Rule not found' });
@@ -150,8 +171,10 @@ export default async function automationRuleController(fastify: FastifyInstance)
   // CREATE automation rule
   fastify.post('/api/v1/automation-rules', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+
       const {
-        tenant_id,
         device_id,
         module_id,
         moduleId,
@@ -173,9 +196,6 @@ export default async function automationRuleController(fastify: FastifyInstance)
         is_enabled
       } = request.body as any;
 
-      const tenant = tenant_id ? { id: tenant_id } : await prisma.tenant.findFirst();
-      if (!tenant) return reply.status(404).send({ success: false, error: 'Tenant not found' });
-
       const validDeviceId = (device_id && typeof device_id === 'string' && device_id.trim() !== '') ? device_id.trim() : null;
       const targetBaseDateKey = base_date_key !== undefined ? base_date_key : baseDateKey || null;
       const targetFixedTime = fixed_time !== undefined ? fixed_time : fixedTime || null;
@@ -185,7 +205,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
       try {
         const rule = await prisma.automationRule.create({
           data: {
-            tenantId: tenant.id,
+            tenantId,
             deviceId: validDeviceId,
             moduleId: targetModuleId,
             name: name || 'Rule Baru',
@@ -208,7 +228,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
       } catch (createErr: any) {
         const rule = await prisma.automationRule.create({
           data: {
-            tenantId: tenant.id,
+            tenantId,
             moduleId: targetModuleId,
             name: name || 'Rule Baru',
             triggerType: trigger_type || 'EVENT_STATUS_CHANGED',
@@ -244,7 +264,17 @@ export default async function automationRuleController(fastify: FastifyInstance)
   // UPDATE automation rule
   fastify.put('/api/v1/automation-rules/:id', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { id } = request.params as any;
+
+      const existing = await prisma.automationRule.findFirst({
+        where: { id, tenantId }
+      });
+      if (!existing) {
+        return reply.status(404).send({ success: false, error: 'Automation Rule not found' });
+      }
+
       const {
         device_id,
         module_id,
@@ -337,7 +367,17 @@ export default async function automationRuleController(fastify: FastifyInstance)
   // DELETE automation rule
   fastify.delete('/api/v1/automation-rules/:id', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { id } = request.params as any;
+
+      const existing = await prisma.automationRule.findFirst({
+        where: { id, tenantId }
+      });
+      if (!existing) {
+        return reply.status(404).send({ success: false, error: 'Automation Rule not found' });
+      }
+
       await prisma.automationRule.delete({ where: { id } });
       return { success: true, message: 'Automation rule deleted successfully' };
     } catch (err: any) {

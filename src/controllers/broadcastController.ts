@@ -68,12 +68,20 @@ export default async function broadcastController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const tenantId = (request as any).tenant?.id;
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
       if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { name, templateId, targetType, deviceId, targets } = request.body as any;
 
       if (!targets || targets.length === 0) {
         return reply.status(400).send({ success: false, error: 'Targets cannot be empty' });
+      }
+
+      // Verify template belongs to tenant
+      const template = await prisma.messageTemplate.findFirst({
+        where: { id: templateId, tenantId }
+      });
+      if (!template) {
+        return reply.status(404).send({ success: false, error: 'Template not found for this tenant' });
       }
 
       // 1. Create the Campaign

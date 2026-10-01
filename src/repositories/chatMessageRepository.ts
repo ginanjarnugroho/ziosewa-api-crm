@@ -143,9 +143,15 @@ export async function findMessagesByChat(tenantId: string, deviceId: string, rem
  * MEMPERBARUI STATUS KESELURUHAN PESAN BELUM DIBACA MENJADI "DIBACA"
  * Ini dieksekusi secara instan ketika staf (agen customer service) meng-klik kontak tertentu di antarmuka.
  */
-export async function markMessagesAsRead(deviceId: string, remoteJid: string) {
+export async function markMessagesAsRead(deviceId: string, remoteJid: string, tenantId?: string) {
   return prisma.chatMessage.updateMany({
-    where: { deviceId, remoteJid, isFromMe: false, status: { not: 'read' } },
+    where: { 
+      deviceId, 
+      remoteJid, 
+      isFromMe: false, 
+      status: { not: 'read' },
+      ...(tenantId ? { tenantId } : {})
+    },
     data: { status: 'read' }
   });
 }
@@ -154,9 +160,14 @@ export async function markMessagesAsRead(deviceId: string, remoteJid: string) {
  * MENCARI PESAN TERAKHIR YANG DIKIRIMKAN OLEH PELANGGAN (UNTUK TRIGGER BACA / READ RECEIPT KE WAHA)
  * Diperlukan agar kita dapat mengirimkan "Read Receipt" (Centang Biru) kembali ke server WhatsApp API (WAHA).
  */
-export async function findLatestUnreadMessage(deviceId: string, remoteJid: string) {
+export async function findLatestUnreadMessage(deviceId: string, remoteJid: string, tenantId?: string) {
   return prisma.chatMessage.findFirst({
-    where: { deviceId, remoteJid, isFromMe: false },
+    where: { 
+      deviceId, 
+      remoteJid, 
+      isFromMe: false,
+      ...(tenantId ? { tenantId } : {})
+    },
     orderBy: { timestamp: 'desc' }
   });
 }
@@ -165,11 +176,12 @@ export async function findLatestUnreadMessage(deviceId: string, remoteJid: strin
  * MENGAMBIL SEMUA PESAN YANG BERISI KONTEN MEDIA (GAMBAR, VIDEO, DOKUMEN)
  * Fitur ini memberikan kemampuan seperti tab "Media, Tautan, dan Dokumen" layaknya di aplikasi WhatsApp asli.
  */
-export async function getMediaGalleryByChat(remoteJid: string, limit: number) {
+export async function getMediaGalleryByChat(remoteJid: string, limit: number, tenantId?: string) {
   return prisma.chatMessage.findMany({
     where: {
       remoteJid,
-      messageType: 'media'
+      messageType: 'media',
+      ...(tenantId ? { tenantId } : {})
     },
     orderBy: { timestamp: 'desc' },
     take: limit

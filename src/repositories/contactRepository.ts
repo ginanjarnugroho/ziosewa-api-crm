@@ -73,9 +73,12 @@ export async function findContactByJid(deviceId: string, remoteJid: string) {
 /**
  * Mencari profil kontak berdasarkan JID saja (tanpa ID device).
  */
-export async function findContactByRemoteJidOnly(remoteJid: string) {
+export async function findContactByRemoteJidOnly(remoteJid: string, tenantId?: string) {
   return prisma.contact.findFirst({
-    where: { remoteJid }
+    where: { 
+      remoteJid,
+      ...(tenantId ? { tenantId } : {})
+    }
   });
 }
 

@@ -1,10 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../repositories/prisma';
+
 export default async function templateController(fastify: FastifyInstance) {
   // List all templates
   fastify.get('/api/v1/templates', async (request, reply) => {
     try {
-      const tenantId = (request as any).tenant?.id;
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
       if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const templates = await prisma.messageTemplate.findMany({
         where: { tenantId },
@@ -19,7 +20,7 @@ export default async function templateController(fastify: FastifyInstance) {
   // Get single template
   fastify.get('/api/v1/templates/:id', async (request, reply) => {
     try {
-      const tenantId = (request as any).tenant?.id;
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
       if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { id } = request.params as any;
       const template = await prisma.messageTemplate.findFirst({
@@ -48,7 +49,7 @@ export default async function templateController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const tenantId = (request as any).tenant?.id;
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
       if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { name, templateText } = request.body as any;
 
@@ -78,7 +79,7 @@ export default async function templateController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     try {
-      const tenantId = (request as any).tenant?.id;
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
       if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { id } = request.params as any;
       const { name, templateText } = request.body as any;
@@ -106,7 +107,7 @@ export default async function templateController(fastify: FastifyInstance) {
   // Delete a template
   fastify.delete('/api/v1/templates/:id', async (request, reply) => {
     try {
-      const tenantId = (request as any).tenant?.id;
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
       if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { id } = request.params as any;
       

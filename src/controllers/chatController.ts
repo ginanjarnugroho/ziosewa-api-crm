@@ -31,7 +31,7 @@ export default async function chatController(fastify: FastifyInstance) {
       tags: ['Chats'],
       querystring: {
         type: 'object',
-        required: ['tenant_id', 'device_id'],
+        required: ['device_id'],
         properties: {
           tenant_id: { type: 'string' },
           device_id: { type: 'string' },
@@ -41,7 +41,9 @@ export default async function chatController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
-    const { tenant_id, device_id } = request.query as any;
+    const tenant_id = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+    if (!tenant_id) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+    const { device_id } = request.query as any;
     const page = Number((request.query as any).page) || 1;
     const limit = Number((request.query as any).limit) || 50;
 
@@ -150,7 +152,7 @@ export default async function chatController(fastify: FastifyInstance) {
       },
       querystring: {
         type: 'object',
-        required: ['tenant_id', 'device_id'],
+        required: ['device_id'],
         properties: {
           tenant_id: { type: 'string' },
           device_id: { type: 'string' }
@@ -159,7 +161,9 @@ export default async function chatController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     const { remoteJid } = request.params as any;
-    const { tenant_id, device_id } = request.query as any;
+    const tenant_id = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+    if (!tenant_id) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+    const { device_id } = request.query as any;
 
     try {
       const device = await findDeviceByIdentifier(device_id, tenant_id);
@@ -215,7 +219,7 @@ export default async function chatController(fastify: FastifyInstance) {
       },
       querystring: {
         type: 'object',
-        required: ['tenant_id', 'device_id'],
+        required: ['device_id'],
         properties: {
           tenant_id: { type: 'string' },
           device_id: { type: 'string' },
@@ -226,7 +230,9 @@ export default async function chatController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     const { remoteJid } = request.params as any;
-    const { tenant_id, device_id, limit, cursor } = request.query as any;
+    const tenant_id = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+    if (!tenant_id) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+    const { device_id, limit, cursor } = request.query as any;
 
     try {
       const device = await findDeviceByIdentifier(device_id, tenant_id);
@@ -386,19 +392,21 @@ export default async function chatController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
+    const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
     const { remoteJid } = request.params as any;
     const { device_id } = request.body as any;
     
     try {
-      const device = await findDeviceByIdentifier(device_id);
+      const device = await findDeviceByIdentifier(device_id, tenantId);
       if (!device) return reply.status(404).send({ success: false, error: 'Device not found' });
 
       // Pastikan pesan yang belum dibaca (unread) ditandai sebagai telah dibaca di Database kita
-      await markMessagesAsRead(device.id, remoteJid);
+      await markMessagesAsRead(device.id, remoteJid, tenantId);
 
       // Usaha ringan (Best-effort): Kirim tanda Read Receipt (Centang Biru) ke server WA
       if (device.status !== 'disconnected') {
-        const latestMsg = await findLatestUnreadMessage(device.id, remoteJid);
+        const latestMsg = await findLatestUnreadMessage(device.id, remoteJid, tenantId);
         
         if (latestMsg) {
           try {
@@ -431,7 +439,7 @@ export default async function chatController(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['tenant_id', 'device_id'],
+        required: ['device_id'],
         properties: {
           tenant_id: { type: 'string' },
           device_id: { type: 'string' }
@@ -440,7 +448,9 @@ export default async function chatController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     const { remoteJid } = request.params as any;
-    const { tenant_id, device_id } = request.body as any;
+    const tenant_id = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenant_id) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+    const { device_id } = request.body as any;
 
     try {
       const device = await findDeviceByIdentifier(device_id, tenant_id);
@@ -473,7 +483,7 @@ export default async function chatController(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['tenant_id', 'device_id', 'emoji'],
+        required: ['device_id', 'emoji'],
         properties: {
           tenant_id: { type: 'string' },
           device_id: { type: 'string' },
@@ -483,7 +493,9 @@ export default async function chatController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     const { remoteJid, messageId } = request.params as any;
-    const { tenant_id, device_id, emoji } = request.body as any;
+    const tenant_id = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenant_id) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+    const { device_id, emoji } = request.body as any;
 
     const device = await findDeviceByIdentifier(device_id, tenant_id);
     if (!device) return reply.status(404).send({ error: 'Device not found' });
@@ -513,7 +525,7 @@ export default async function chatController(fastify: FastifyInstance) {
       },
       querystring: {
         type: 'object',
-        required: ['tenant_id', 'device_id'],
+        required: ['device_id'],
         properties: {
           tenant_id: { type: 'string' },
           device_id: { type: 'string' }
@@ -522,7 +534,9 @@ export default async function chatController(fastify: FastifyInstance) {
     }
   }, async (request, reply) => {
     const { remoteJid } = request.params as any;
-    const { tenant_id, device_id } = request.query as any;
+    const tenant_id = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+    if (!tenant_id) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+    const { device_id } = request.query as any;
 
     try {
       const device = await findDeviceByIdentifier(device_id, tenant_id);
@@ -570,12 +584,15 @@ export default async function chatController(fastify: FastifyInstance) {
   // Get Contact Profile (tags, notes, email)
   fastify.get('/api/v1/contacts/:remoteJid/profile', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { remoteJid } = request.params as any;
-      const gcsPath = `contacts/${remoteJid}/profile.json`;
-      const profileData = await readJson(gcsPath) || {};
+      const gcsPath = `tenants/${tenantId}/contacts/${remoteJid}/profile.json`;
+      const legacyGcsPath = `contacts/${remoteJid}/profile.json`;
+      const profileData = (await readJson(gcsPath)) || (await readJson(legacyGcsPath)) || {};
       
       // Muat informasi profil lokal (dari file json dan db)
-      const contact = await findContactByRemoteJidOnly(remoteJid);
+      const contact = await findContactByRemoteJidOnly(remoteJid, tenantId);
 
       return {
         success: true,
@@ -596,11 +613,14 @@ export default async function chatController(fastify: FastifyInstance) {
   // Update Contact Profile (tags, notes, email)
   fastify.put('/api/v1/contacts/:remoteJid/profile', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { remoteJid } = request.params as any;
       const { email, notes, tags } = request.body as any;
 
-      const gcsPath = `contacts/${remoteJid}/profile.json`;
-      const existing = await readJson(gcsPath) || {};
+      const gcsPath = `tenants/${tenantId}/contacts/${remoteJid}/profile.json`;
+      const legacyGcsPath = `contacts/${remoteJid}/profile.json`;
+      const existing = (await readJson(gcsPath)) || (await readJson(legacyGcsPath)) || {};
       
       const updated = {
         ...existing,
@@ -621,9 +641,11 @@ export default async function chatController(fastify: FastifyInstance) {
   // Get Chat Media Gallery
   fastify.get('/api/v1/chats/:remoteJid/media-gallery', async (request, reply) => {
     try {
+      const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+      if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
       const { remoteJid } = request.params as any;
       // Muat kumpulan galeri gambar dari riwayat chat
-      const mediaMessages = await getMediaGalleryByChat(remoteJid, 100);
+      const mediaMessages = await getMediaGalleryByChat(remoteJid, 100, tenantId);
 
       return {
         success: true,

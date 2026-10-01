@@ -26,7 +26,7 @@ export const authMiddleware = async (request: FastifyRequest, reply: FastifyRepl
     // IDOR Protection: Ensure that if the client sends tenant_id in query or body, it matches their API Key
     const query = request.query as any;
     const body = request.body as any;
-    const requestedTenantId = query?.tenant_id || body?.tenant_id;
+    const requestedTenantId = query?.tenant_id || body?.tenant_id || query?.tenantId || body?.tenantId;
 
     if (requestedTenantId && requestedTenantId !== tenant.id) {
       return reply.status(403).send({ success: false, error: 'Access denied: You cannot access resources for another tenant_id' });

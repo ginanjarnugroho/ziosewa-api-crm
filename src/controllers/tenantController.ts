@@ -17,7 +17,8 @@ export default async function tenantController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
-    const tenantId = (request as any).tenant.id;
+    const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
     const { webhook_url } = request.body as any;
 
     try {

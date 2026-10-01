@@ -20,7 +20,8 @@ export default async function contactController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
-    const tenantId = (request as any).tenant.id;
+    const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
     const { device_id } = request.query as any;
     const page = Number((request.query as any).page) || 1;
     const limit = Number((request.query as any).limit) || 50;
@@ -112,7 +113,8 @@ export default async function contactController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
-    const tenantId = (request as any).tenant.id;
+    const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
     const { remoteJid } = request.params as any;
     const { device_id, name } = request.body as any;
 

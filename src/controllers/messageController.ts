@@ -26,12 +26,15 @@ export default async function messageController(fastify: FastifyInstance) {
       }
     }
   }, async (request, reply) => {
-    // 1. Ambil data payload (pengirim, tujuan, isi pesan) dari request body
-    const { device_id, to, message, idempotency_key, reply_to, tenant_id } = request.body as any;
+    // 1. Ambil tenantId & data payload dari request
+    const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+
+    const { device_id, to, message, idempotency_key, reply_to } = request.body as any;
     const toJid = normalizeJid(to);
 
-    // 2. Cari data perangkat (Device) melalui Repository Layer
-    const device = await findDeviceByIdentifier(device_id);
+    // 2. Cari data perangkat (Device) milik Tenant melalui Repository Layer
+    const device = await findDeviceByIdentifier(device_id, tenantId);
     if (!device) return reply.status(404).send({ error: 'Device not found' });
 
     // 3. Pastikan perangkat (Device) sedang terkoneksi ke server WAHA
@@ -43,7 +46,7 @@ export default async function messageController(fastify: FastifyInstance) {
 
     // 4. Catat pesan ini ke dalam Log (MessageLog) sebagai antrean ('queued')
     const log = await createMessageLog({
-      tenantId: tenant_id || device.tenantId,
+      tenantId,
       deviceId: device.id,
       channelType: device.channelType,
       direction: 'outbound',
@@ -54,7 +57,6 @@ export default async function messageController(fastify: FastifyInstance) {
     });
 
     // 5. Masukkan pesan ke dalam Antrean Background (BullMQ / Redis)
-    //    agar pengiriman pesan tidak memblokir respon HTTP (Non-blocking)
     const job = await CloudTasksService.enqueueTask('/api/v1/internal/tasks/send-text', {
       deviceId: device.id,
       channelType: device.channelType,
@@ -84,6 +86,7 @@ export default async function messageController(fastify: FastifyInstance) {
     if (!data) return reply.status(400).send({ success: false, error: 'No file uploaded' });
 
     const deviceIdField = data.fields['device_id'] as any;
+    const tenantIdField = data.fields['tenant_id'] as any;
     const toField = data.fields['to'] as any;
     const captionField = data.fields['caption'] as any;
     const channelField = data.fields['channel_type'] as any;
@@ -97,12 +100,15 @@ export default async function messageController(fastify: FastifyInstance) {
     const idempotencyKey = idempotencyKeyField?.value;
     const reply_to = replyToField?.value;
 
+    const tenantId = (request as any).tenant?.id || tenantIdField?.value;
+    if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
+
     if (!deviceId || !to) return reply.status(400).send({ success: false, error: 'Missing device_id or to' });
 
     try {
       const buffer = await data.toBuffer();
       
-      const device = await findDeviceByIdentifier(deviceId);
+      const device = await findDeviceByIdentifier(deviceId, tenantId);
       if (!device) return reply.status(404).send({ error: 'Device not found' });
       
       if (device.status === 'disconnected') {
@@ -110,7 +116,6 @@ export default async function messageController(fastify: FastifyInstance) {
       }
 
       // 3. Hasilkan ID Pesan Sementara (Temporary ID)
-      // ID ini nantinya akan dicocokkan & diganti oleh Webhook ketika pesan benar-benar terkirim.
       const msgId = `media_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       // 4. Upload file yang dikirim pengguna ke Google Cloud Storage (GCS)
@@ -121,7 +126,7 @@ export default async function messageController(fastify: FastifyInstance) {
 
       // 5. Masukkan tugas pengiriman Media ini ke dalam Antrean (Queue)
       const job = await CloudTasksService.enqueueTask('/api/v1/internal/tasks/send-media', {
-        tenantId: device.tenantId,
+        tenantId,
         deviceId: device.id,
         channelType,
         payload: {
