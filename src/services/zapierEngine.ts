@@ -30,6 +30,8 @@ export function compileTemplateText(templateText: string, data: Record<string, a
   const replacements: Record<string, string> = {
     '{nama_pelanggan}': data.nama_pelanggan || 'Pelanggan',
     '{{nama_pelanggan}}': data.nama_pelanggan || 'Pelanggan',
+    '{nama_agent}': data.nama_agent || 'Agent',
+    '{{nama_agent}}': data.nama_agent || 'Agent',
     '{nama_barang}': data.nama_barang || 'Barang Sewa',
     '{{nama_barang}}': data.nama_barang || 'Barang Sewa',
     '{tgl_sewa}': data.tgl_sewa || '-',
