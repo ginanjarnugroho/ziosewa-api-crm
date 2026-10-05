@@ -4,6 +4,7 @@ import { WahaAdapter } from '../adapters/WahaAdapter';
 import { prisma } from '../repositories/prisma';
 import { io } from '../server';
 import { upsertMessage } from '../repositories/chatMessageRepository';
+import { processBroadcastCampaign } from '../services/broadcastService';
 
 export default {
   async handleSendText(request: FastifyRequest, reply: FastifyReply) {
@@ -160,6 +161,21 @@ export default {
           data: { status: 'FAILED', lastError: error?.message || 'Cloud Tasks dispatch failed' }
         });
       }
+      return reply.status(500).send({ success: false, error: error?.message || 'Failed' });
+    }
+  },
+
+  async handleProcessBroadcast(request: FastifyRequest, reply: FastifyReply) {
+    const { campaignId } = request.body as any;
+    try {
+      console.log(`[Cloud Tasks Broadcast] Processing campaignId: ${campaignId}`);
+      if (campaignId) {
+        await processBroadcastCampaign(campaignId);
+        return reply.send({ success: true, message: 'Broadcast campaign processed via Cloud Tasks' });
+      }
+      return reply.send({ success: true });
+    } catch (error: any) {
+      console.error('[Cloud Tasks Broadcast Error]', error?.message || error);
       return reply.status(500).send({ success: false, error: error?.message || 'Failed' });
     }
   }

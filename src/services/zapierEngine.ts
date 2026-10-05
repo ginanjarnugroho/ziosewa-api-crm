@@ -29,28 +29,49 @@ export function compileTemplateText(templateText: string, data: Record<string, a
   let result = templateText;
   const replacements: Record<string, string> = {
     '{nama_pelanggan}': data.nama_pelanggan || 'Pelanggan',
+    '{{nama_pelanggan}}': data.nama_pelanggan || 'Pelanggan',
     '{nama_barang}': data.nama_barang || 'Barang Sewa',
+    '{{nama_barang}}': data.nama_barang || 'Barang Sewa',
     '{tgl_sewa}': data.tgl_sewa || '-',
+    '{{tgl_sewa}}': data.tgl_sewa || '-',
     '{tgl_acara}': data.tgl_acara || '-',
+    '{{tgl_acara}}': data.tgl_acara || '-',
     '{tgl_ambil}': data.tgl_ambil || '-',
+    '{{tgl_ambil}}': data.tgl_ambil || '-',
     '{tgl_kembali}': data.tgl_kembali || '-',
+    '{{tgl_kembali}}': data.tgl_kembali || '-',
     '{total_bayar}': data.total_bayar || '-',
+    '{{total_bayar}}': data.total_bayar || '-',
     '{sisa_tagihan}': data.sisa_tagihan || '-',
-    '{alamat_toko}': data.alamat_toko || '-'
+    '{{sisa_tagihan}}': data.sisa_tagihan || '-',
+    '{alamat_toko}': data.alamat_toko || '-',
+    '{{alamat_toko}}': data.alamat_toko || '-'
   };
 
   for (const [tag, val] of Object.entries(replacements)) {
     result = result.split(tag).join(val);
   }
 
-  // Also support custom {key} matching from data object
   for (const [key, val] of Object.entries(data)) {
     if (typeof val === 'string' || typeof val === 'number') {
       result = result.split(`{${key}}`).join(String(val));
+      result = result.split(`{{${key}}}`).join(String(val));
+      result = result.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), String(val));
     }
   }
 
   return result;
+}
+
+export function normalizePhone(phone: string): string {
+  if (!phone) return '';
+  const trimmed = phone.trim();
+  if (trimmed.endsWith('@g.us')) return trimmed;
+  let rawDigits = trimmed.replace(/\D/g, '');
+  if (rawDigits.startsWith('0')) {
+    rawDigits = '62' + rawDigits.slice(1);
+  }
+  return rawDigits.endsWith('@c.us') ? rawDigits : `${rawDigits}@c.us`;
 }
 
 export function parseBaseDate(val: any, fallbackDate?: Date): Date | null {
@@ -103,11 +124,7 @@ export function enforceQuietHours(scheduledDate: Date, startStr: string = '20:00
 
 export async function processIncomingWebhook(payload: WebhookPayload) {
   // Normalize phone number to @c.us format
-  let rawDigits = payload.customer_phone.replace(/\D/g, '');
-  if (rawDigits.startsWith('0')) {
-    rawDigits = '62' + rawDigits.slice(1);
-  }
-  const recipientJid = rawDigits.endsWith('@c.us') ? rawDigits : `${rawDigits}@c.us`;
+  const recipientJid = normalizePhone(payload.customer_phone);
 
   // Find active device for sending
   const device = await prisma.device.findFirst({

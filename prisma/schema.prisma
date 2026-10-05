@@ -251,6 +251,7 @@ enum TargetType {
 
 enum BroadcastStatus {
   DRAFT
+  SCHEDULED
   PROCESSING
   COMPLETED
   FAILED
@@ -264,6 +265,7 @@ model BroadcastCampaign {
   templateId    String          @map("template_id") @db.Uuid
   targetType    TargetType      @map("target_type")
   status        BroadcastStatus @default(DRAFT)
+  scheduledAt   DateTime?       @map("scheduled_at")
   totalTargets  Int             @default(0) @map("total_targets")
   successCount  Int             @default(0) @map("success_count")
   failedCount   Int             @default(0) @map("failed_count")

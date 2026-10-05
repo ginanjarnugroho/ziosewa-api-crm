@@ -9,4 +9,5 @@ export default async function taskRoutes(fastify: FastifyInstance) {
   fastify.post('/api/v1/internal/tasks/sync-history', taskController.handleSyncHistory);
   fastify.post('/api/v1/internal/tasks/download-media', taskController.handleDownloadMedia);
   fastify.post('/api/v1/internal/tasks/process-automation', taskController.handleProcessAutomation);
+  fastify.post('/api/v1/internal/tasks/process-broadcast', taskController.handleProcessBroadcast);
 }

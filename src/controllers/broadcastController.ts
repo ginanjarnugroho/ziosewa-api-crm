@@ -1,6 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../repositories/prisma';
 import { processBroadcastCampaign } from '../services/broadcastService';
+import { CloudTasksService } from '../services/CloudTasksService';
+import { normalizePhone } from '../services/zapierEngine';
 
 export default async function broadcastController(fastify: FastifyInstance) {
   // List all campaigns
@@ -52,6 +54,8 @@ export default async function broadcastController(fastify: FastifyInstance) {
           templateId: { type: 'string' },
           targetType: { type: 'string', enum: ['CUSTOMER', 'AGENT', 'CUSTOM'] },
           deviceId: { type: 'string', nullable: true },
+          scheduleAt: { type: 'string', nullable: true },
+          scheduledAt: { type: 'string', nullable: true },
           targets: {
             type: 'array',
             items: {
@@ -70,7 +74,7 @@ export default async function broadcastController(fastify: FastifyInstance) {
     try {
       const tenantId = (request as any).tenant?.id || (request.body as any)?.tenant_id;
       if (!tenantId) return reply.status(401).send({ success: false, error: 'Unauthorized' });
-      const { name, templateId, targetType, deviceId, targets } = request.body as any;
+      const { name, templateId, targetType, deviceId, targets, scheduleAt, scheduledAt } = request.body as any;
 
       if (!targets || targets.length === 0) {
         return reply.status(400).send({ success: false, error: 'Targets cannot be empty' });
@@ -84,6 +88,18 @@ export default async function broadcastController(fastify: FastifyInstance) {
         return reply.status(404).send({ success: false, error: 'Template not found for this tenant' });
       }
 
+      // Parse optional scheduleAt / scheduledAt
+      const rawSchedule = scheduleAt || scheduledAt;
+      let scheduledDate: Date | null = null;
+      if (rawSchedule) {
+        const parsed = new Date(rawSchedule);
+        if (!isNaN(parsed.getTime())) {
+          scheduledDate = parsed;
+        }
+      }
+
+      const isScheduledInFuture = !!(scheduledDate && scheduledDate.getTime() > Date.now());
+
       // 1. Create the Campaign
       const campaign = await prisma.broadcastCampaign.create({
         data: {
@@ -93,14 +109,15 @@ export default async function broadcastController(fastify: FastifyInstance) {
           targetType,
           deviceId: deviceId || null,
           totalTargets: targets.length,
-          status: 'DRAFT',
+          status: isScheduledInFuture ? 'SCHEDULED' : 'DRAFT',
+          scheduledAt: scheduledDate
         }
       });
 
-      // 2. Create the Targets in DB
+      // 2. Create the Targets in DB (overriding target.phone using normalizePhone)
       const targetData = targets.map((t: any) => ({
         campaignId: campaign.id,
-        phone: t.phone,
+        phone: normalizePhone(t.phone),
         variables: t.variables || {},
         status: 'PENDING' as const
       }));
@@ -109,14 +126,30 @@ export default async function broadcastController(fastify: FastifyInstance) {
         data: targetData
       });
 
-      // 3. Trigger processing asynchronously in the background (DO NOT AWAIT)
-      processBroadcastCampaign(campaign.id).catch(err => {
-        console.error('Background processBroadcastCampaign error:', err);
-      });
+      // 3. Process or Schedule via Cloud Tasks
+      if (isScheduledInFuture && scheduledDate) {
+        try {
+          await CloudTasksService.enqueueTask(
+            '/api/v1/internal/tasks/process-broadcast',
+            { campaignId: campaign.id },
+            scheduledDate
+          );
+          console.log(`[Broadcast] Enqueued campaign ${campaign.id} to Cloud Tasks for ${scheduledDate.toISOString()}`);
+        } catch (ctErr: any) {
+          console.warn('[Broadcast] Cloud Tasks scheduling skipped/fallback to background trigger:', ctErr.message);
+        }
+      } else {
+        // Trigger processing immediately in background
+        processBroadcastCampaign(campaign.id).catch(err => {
+          console.error('Background processBroadcastCampaign error:', err);
+        });
+      }
 
       return { 
         success: true, 
-        message: 'Campaign created and queued for processing',
+        message: isScheduledInFuture
+          ? `Campaign created and scheduled for ${scheduledDate!.toISOString()}`
+          : 'Campaign created and queued for processing',
         data: campaign 
       };
     } catch (error: any) {
