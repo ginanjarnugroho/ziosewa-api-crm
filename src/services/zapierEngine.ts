@@ -103,7 +103,7 @@ export function parseBaseDate(val: any, fallbackDate?: Date): Date | null {
   return fallbackDate || null;
 }
 
-export function enforceQuietHours(scheduledDate: Date, startStr: string = '20:00', endStr: string = '08:00'): Date {
+export function enforceQuietHours(scheduledDate: Date, startStr: string, endStr: string): Date {
   const target = new Date(scheduledDate);
   const hour = target.getHours();
 
@@ -247,11 +247,13 @@ export async function processIncomingWebhook(payload: WebhookPayload) {
     }
 
     // Apply Quiet Hours adjustment (08:00 - 20:00)
-    scheduledTime = enforceQuietHours(
-      scheduledTime,
-      rule.quietHoursStart || '20:00',
-      rule.quietHoursEnd || '08:00'
-    );
+    if(rule.quietHoursStart && rule.quietHoursEnd) {
+      scheduledTime = enforceQuietHours(
+        scheduledTime,
+        rule.quietHoursStart,
+        rule.quietHoursEnd
+      );
+    }
 
     // Compile template text
     const rawTemplateText = rule.templateText || rule.template?.templateText || '';
