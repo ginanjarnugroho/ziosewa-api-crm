@@ -216,8 +216,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
             offsetDirection: offset_direction || 'IMMEDIATE',
             baseDateKey: targetBaseDateKey,
             fixedTime: targetFixedTime,
-            quietHoursStart: quiet_hours_start || '20:00',
-            quietHoursEnd: quiet_hours_end || '08:00',
+            quietHoursStart: quiet_hours_start,
+            quietHoursEnd: quiet_hours_end,
             templateId: template_id || undefined,
             templateText: targetTemplateText,
             isEnabled: is_enabled !== undefined ? is_enabled : true
@@ -238,8 +238,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
             offsetDirection: offset_direction || 'IMMEDIATE',
             baseDateKey: targetBaseDateKey,
             fixedTime: targetFixedTime,
-            quietHoursStart: quiet_hours_start || '20:00',
-            quietHoursEnd: quiet_hours_end || '08:00',
+            quietHoursStart: quiet_hours_start,
+            quietHoursEnd: quiet_hours_end,
             templateId: template_id || undefined,
             templateText: targetTemplateText,
             isEnabled: is_enabled !== undefined ? is_enabled : true
