@@ -70,7 +70,7 @@ export async function handleSessionStatus(payload: any, device: any, deviceId: s
        }
      }, 1500);
      
-  } else if (status === 'FAILED') {
+  } else if (status === 'FAILED' || status === 'STOPPED') {
      // Koneksi WhatsApp terputus atau sesi gagal.
      // Perbarui status database menjadi 'disconnected'
      await updateDeviceStatus(deviceId, 'disconnected', 'DISCONNECTED');
