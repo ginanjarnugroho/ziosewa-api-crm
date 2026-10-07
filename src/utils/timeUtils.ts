@@ -58,3 +58,34 @@ export function extractTime(val: any): string | null {
 
   return null;
 }
+
+/**
+ * Takes a time string (e.g. "14:00", "20:00") or datetime string,
+ * extracts hours and minutes, and sets them on a default Date (today), returning the Date object.
+ * Returns null if input is null, undefined, or empty.
+ */
+export function timeStringToDate(timeVal: any, baseDate?: Date): Date | null {
+  if (timeVal === null || timeVal === undefined || timeVal === '') return null;
+  if (timeVal instanceof Date) {
+    return isNaN(timeVal.getTime()) ? null : timeVal;
+  }
+
+  const str = String(timeVal).trim();
+  if (!str) return null;
+
+  // Extract HH:mm from time string or datetime string
+  const timeMatch = str.match(/(?:^|[T\s])(\d{1,2}):(\d{2})/);
+  if (!timeMatch) {
+    const parsed = new Date(str);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const hours = parseInt(timeMatch[1], 10);
+  const minutes = parseInt(timeMatch[2], 10);
+  if (isNaN(hours) || isNaN(minutes)) return null;
+
+  const d = baseDate ? new Date(baseDate.getTime()) : new Date();
+  d.setHours(hours, minutes, 0, 0);
+  return d;
+}
+

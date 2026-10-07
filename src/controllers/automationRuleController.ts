@@ -1,7 +1,29 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../repositories/prisma';
 import { compileTemplateText } from '../services/zapierEngine';
-import { extractTime } from '../utils/timeUtils';
+import { extractTime, timeStringToDate } from '../utils/timeUtils';
+
+export function formatAutomationRuleResponse(rule: any): any {
+  if (!rule) return rule;
+
+  const rawFixed = rule.fixedTime !== undefined ? rule.fixedTime : rule.fixed_time;
+  const rawQuietStart = rule.quietHoursStart !== undefined ? rule.quietHoursStart : rule.quiet_hours_start;
+  const rawQuietEnd = rule.quietHoursEnd !== undefined ? rule.quietHoursEnd : rule.quiet_hours_end;
+
+  const fixedDate = timeStringToDate(rawFixed);
+  const quietStartDate = timeStringToDate(rawQuietStart);
+  const quietEndDate = timeStringToDate(rawQuietEnd);
+
+  return {
+    ...rule,
+    fixedTime: fixedDate,
+    fixed_time: fixedDate,
+    quietHoursStart: quietStartDate,
+    quiet_hours_start: quietStartDate,
+    quietHoursEnd: quietEndDate,
+    quiet_hours_end: quietEndDate
+  };
+}
 
 export default async function automationRuleController(fastify: FastifyInstance) {
   // GET all templates
@@ -132,7 +154,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
         WHERE r.tenant_id = '${tenantId}'::uuid
         ORDER BY r.created_at DESC
       `);
-      return { success: true, data: rawRules };
+      return { success: true, data: rawRules.map(formatAutomationRuleResponse) };
     } catch (err: any) {
       console.error('[GET automation-rules Raw Error]', err.message);
       const tenantId = (request as any).tenant?.id || (request.query as any)?.tenant_id;
@@ -143,7 +165,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
         include: { template: true },
         orderBy: { createdAt: 'desc' }
       });
-      return { success: true, data: rules };
+      return { success: true, data: rules.map(formatAutomationRuleResponse) };
     }
   });
 
@@ -162,7 +184,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
         return reply.status(404).send({ success: false, error: 'Automation Rule not found' });
       }
 
-      return { success: true, data: automationRole };
+      return { success: true, data: formatAutomationRuleResponse(automationRole) };
     } catch (err: any) {
       console.error('[GET automation-rule by id Error]', err);
       return reply.status(500).send({ success: false, error: err.message });
@@ -230,7 +252,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
           },
           include: { template: true }
         });
-        return { success: true, data: rule };
+        return { success: true, data: formatAutomationRuleResponse(rule) };
       } catch (createErr: any) {
         const rule = await prisma.automationRule.create({
           data: {
@@ -259,7 +281,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
           );
         }
 
-        return { success: true, data: rule };
+        return { success: true, data: formatAutomationRuleResponse(rule) };
       }
     } catch (err: any) {
       console.error('[CREATE Rule Error]', err);
@@ -346,7 +368,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
           include: { template: true }
         });
 
-        return { success: true, data: rule };
+        return { success: true, data: formatAutomationRuleResponse(rule) };
       } catch (prismaValidationErr: any) {
         delete updateData.deviceId;
 
@@ -368,7 +390,7 @@ export default async function automationRuleController(fastify: FastifyInstance)
           include: { template: true }
         });
 
-        return { success: true, data: rule };
+        return { success: true, data: formatAutomationRuleResponse(rule) };
       }
     } catch (err: any) {
       console.error('[UPDATE Rule Error]', err);
