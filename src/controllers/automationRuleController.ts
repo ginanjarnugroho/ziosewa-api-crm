@@ -10,9 +10,10 @@ export function formatAutomationRuleResponse(rule: any): any {
   const rawQuietStart = rule.quietHoursStart !== undefined ? rule.quietHoursStart : rule.quiet_hours_start;
   const rawQuietEnd = rule.quietHoursEnd !== undefined ? rule.quietHoursEnd : rule.quiet_hours_end;
 
-  const fixedDate = timeStringToDate(rawFixed);
-  const quietStartDate = timeStringToDate(rawQuietStart);
-  const quietEndDate = timeStringToDate(rawQuietEnd);
+  const baseDate = new Date('1970-01-01T00:00:00.000Z');
+  const fixedDate = timeStringToDate(rawFixed, baseDate);
+  const quietStartDate = timeStringToDate(rawQuietStart, baseDate);
+  const quietEndDate = timeStringToDate(rawQuietEnd, baseDate);
 
   return {
     ...rule,
