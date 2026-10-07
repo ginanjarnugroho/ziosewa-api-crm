@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../repositories/prisma';
 import { compileTemplateText } from '../services/zapierEngine';
+import { extractTime } from '../utils/timeUtils';
 
 export default async function automationRuleController(fastify: FastifyInstance) {
   // GET all templates
@@ -198,9 +199,14 @@ export default async function automationRuleController(fastify: FastifyInstance)
 
       const validDeviceId = (device_id && typeof device_id === 'string' && device_id.trim() !== '') ? device_id.trim() : null;
       const targetBaseDateKey = base_date_key !== undefined ? base_date_key : baseDateKey || null;
-      const targetFixedTime = fixed_time !== undefined ? fixed_time : fixedTime || null;
+      const targetFixedTime = fixed_time !== undefined 
+        ? (fixed_time ? extractTime(fixed_time) : null) 
+        : (fixedTime ? extractTime(fixedTime) : null);
       const targetModuleId = module_id !== undefined ? module_id : moduleId || null;
       const targetTemplateText = template_text !== undefined ? template_text : templateText || null;
+
+      const targetQuietHoursStart = quiet_hours_start ? extractTime(quiet_hours_start) : null;
+      const targetQuietHoursEnd = quiet_hours_end ? extractTime(quiet_hours_end) : null;
 
       try {
         const rule = await prisma.automationRule.create({
@@ -216,8 +222,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
             offsetDirection: offset_direction || 'IMMEDIATE',
             baseDateKey: targetBaseDateKey,
             fixedTime: targetFixedTime,
-            quietHoursStart: quiet_hours_start,
-            quietHoursEnd: quiet_hours_end,
+            quietHoursStart: targetQuietHoursStart,
+            quietHoursEnd: targetQuietHoursEnd,
             templateId: template_id || undefined,
             templateText: targetTemplateText,
             isEnabled: is_enabled !== undefined ? is_enabled : true
@@ -238,8 +244,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
             offsetDirection: offset_direction || 'IMMEDIATE',
             baseDateKey: targetBaseDateKey,
             fixedTime: targetFixedTime,
-            quietHoursStart: quiet_hours_start,
-            quietHoursEnd: quiet_hours_end,
+            quietHoursStart: targetQuietHoursStart,
+            quietHoursEnd: targetQuietHoursEnd,
             templateId: template_id || undefined,
             templateText: targetTemplateText,
             isEnabled: is_enabled !== undefined ? is_enabled : true
@@ -308,7 +314,8 @@ export default async function automationRuleController(fastify: FastifyInstance)
         updateData.baseDateKey = base_date_key !== undefined ? base_date_key : baseDateKey;
       }
       if (fixed_time !== undefined || fixedTime !== undefined) {
-        updateData.fixedTime = fixed_time !== undefined ? fixed_time : fixedTime;
+        const rawFixedTime = fixed_time !== undefined ? fixed_time : fixedTime;
+        updateData.fixedTime = rawFixedTime ? extractTime(rawFixedTime) : null;
       }
       if (module_id !== undefined || moduleId !== undefined) {
         updateData.moduleId = module_id !== undefined ? module_id : moduleId;
@@ -316,8 +323,13 @@ export default async function automationRuleController(fastify: FastifyInstance)
       if (template_text !== undefined || templateText !== undefined) {
         updateData.templateText = template_text !== undefined ? template_text : templateText;
       }
-      if (quiet_hours_start !== undefined) updateData.quietHoursStart = quiet_hours_start;
-      if (quiet_hours_end !== undefined) updateData.quietHoursEnd = quiet_hours_end;
+
+      if (quiet_hours_start !== undefined) {
+        updateData.quietHoursStart = quiet_hours_start ? extractTime(quiet_hours_start) : null;
+      }
+      if (quiet_hours_end !== undefined) {
+        updateData.quietHoursEnd = quiet_hours_end ? extractTime(quiet_hours_end) : null;
+      }
       if (template_id !== undefined) updateData.templateId = template_id;
       if (is_enabled !== undefined) updateData.isEnabled = is_enabled;
 
